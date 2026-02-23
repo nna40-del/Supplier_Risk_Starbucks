@@ -1,0 +1,306 @@
+{
+    "suppliers": [
+        {
+            "name": "FGF Brands",
+            "foodSafetyQuality": {
+                "gfsCertification": "SQF Level 3",
+                "lastAudit": "2025-06",
+                "recallHistory": "None in last 5 years",
+                "allergenControls": "Documented and validated",
+                "capaClosureRate": "98% within SLA",
+                "customerComplaints": "<0.3 per 10,000 units"
+            },
+            "regulatoryCompliance": {
+                "fdaInspections": "No 483s in last 3 inspections",
+                "supplierCodeOfConduct": "Signed and current",
+                "environmentalPermits": "Active, no violations",
+                "importExportCompliance": "Fully compliant"
+            },
+            "operationalReliability": {
+                "otif": "97%",
+                "leadTime": "7–10 days",
+                "capacityUtilization": "80%",
+                "backupFacilities": 2,
+                "businessContinuityPlan": "Documented and tested annually"
+            },
+            "financialStability": {
+                "creditRisk": "Low (internal assessment)",
+                "revenueTrend": "Stable YoY",
+                "insuranceCoverage": "Product liability and recall",
+                "customerRevenueConcentration": "<20%"
+            }
+        },
+        {
+            "name": "Diana’s Bakery",
+            "foodSafetyQuality": {
+                "gfsCertification": "BRCGS",
+                "auditFrequency": "Annual",
+                "recallHistory": "One Class III recall (4 years ago)",
+                "haccp": "Reviewed annually",
+                "traceabilityTest": "Completed within 2 hours"
+            },
+            "regulatoryCompliance": {
+                "fdaInspections": "One minor observation, closed",
+                "laborCompliance": "No violations",
+                "supplierCodeOfConduct": "Signed",
+                "sustainabilityReporting": "Limited"
+            },
+            "operationalReliability": {
+                "otif": "95%",
+                "leadTime": "10–14 days",
+                "productionFlexibility": "Moderate",
+                "disruptions": "One weather-related delay"
+            },
+            "financialStability": {
+                "ownership": "Private",
+                "creditReview": "Satisfactory",
+                "commodityExposure": "Moderate dairy volatility",
+                "insuranceCoverage": "General liability"
+            }
+        },
+        {
+            "name": "SK Food Group Inc.",
+            "foodSafetyQuality": {
+                "gfsCertification": "SQF",
+                "microTesting": "Daily finished product testing",
+                "recallHistory": "None in last 3 years",
+                "allergenControls": "Documented change controls",
+                "complaintTrend": "Stable"
+            },
+            "regulatoryCompliance": {
+                "regulatoryOversight": "FDA and USDA routine inspections",
+                "open483s": "None",
+                "ethicalSourcing": "Supplier attestations collected",
+                "importExport": "Domestic only"
+            },
+            "operationalReliability": {
+                "otif": "94%",
+                "coldChainControls": "Strict monitoring",
+                "capacityUtilization": "85%",
+                "backupSuppliers": "Identified"
+            },
+            "financialStability": {
+                "cashFlow": "Stable",
+                "ownership": "Private equity backed",
+                "insuranceCoverage": "Recall and product liability"
+            }
+        },
+        {
+            "name": "Stevens Charles Original Desserts",
+            "foodSafetyQuality": {
+                "gfsCertification": "SQF",
+                "auditFindings": "No critical findings",
+                "shelfLifeValidation": "Annual",
+                "customerComplaints": "Low volume"
+            },
+            "regulatoryCompliance": {
+                "fdaInspections": "No enforcement actions",
+                "labelingCompliance": "Verified",
+                "supplierCodeOfConduct": "Signed"
+            },
+            "operationalReliability": {
+                "otif": "93%",
+                "capacityConstraints": "Seasonal",
+                "backupFacility": "None",
+                "businessContinuityPlan": "Partial documentation"
+            },
+            "financialStability": {
+                "revenueVariability": "Seasonal",
+                "creditRisk": "Moderate",
+                "insuranceCoverage": "Active"
+            }
+        },
+        {
+            "name": "Sterling BV Inc.",
+            "foodSafetyQuality": {
+                "gfsCertification": "BRCGS",
+                "recallHistory": "None reported",
+                "capaTracking": "Manual",
+                "traceabilityTest": "4-hour mock recall"
+            },
+            "regulatoryCompliance": {
+                "fdaInspections": "Clean last inspection",
+                "environmentalCompliance": "No violations",
+                "supplierCodeOfConduct": "Signed"
+            },
+            "operationalReliability": {
+                "otif": "92%",
+                "leadTime": "12–15 days",
+                "facilities": 1
+            },
+            "financialStability": {
+                "creditReview": "Acceptable",
+                "revenueConcentration": "Moderate"
+            }
+        },
+        {
+            "name": "Boulangerie Première Moisson Inc.",
+            "foodSafetyQuality": {
+                "gfsCertification": "FSSC 22000",
+                "internalAudits": "Quarterly",
+                "allergenManagement": "Dedicated production lines"
+            },
+            "regulatoryCompliance": {
+                "cfiaCompliance": "Compliant",
+                "importDocumentation": "Accurate and current"
+            },
+            "operationalReliability": {
+                "otif": "96%",
+                "leadTime": "Short",
+                "redundancy": "Limited"
+            },
+            "financialStability": {
+                "financialReview": "Stable",
+                "insuranceCoverage": "Standard food manufacturing"
+            }
+        },
+        {
+            "name": "Eli’s Cheesecake Company",
+            "foodSafetyQuality": {
+                "gfsCertification": "SQF",
+                "recallHistory": "None",
+                "environmentalMonitoring": "Routine swabbing",
+                "complaintResolution": "<5 business days"
+            },
+            "regulatoryCompliance": {
+                "fdaInspections": "No major findings",
+                "laborCompliance": "Documented"
+            },
+            "operationalReliability": {
+                "otif": "94%",
+                "productionFlexibility": "Moderate",
+                "coldChainControls": "Continuous monitoring"
+            },
+            "financialStability": {
+                "creditRisk": "Low",
+                "insuranceCoverage": "Recall and liability"
+            }
+        },
+        {
+            "name": "Aryzta LLC",
+            "foodSafetyQuality": {
+                "gfsCertification": "Multiple certified sites",
+                "auditFrequency": "Annual plus customer audits",
+                "recallHistory": "One voluntary recall (5 years ago)"
+            },
+            "regulatoryCompliance": {
+                "complianceProgram": "Global",
+                "fdaObservations": "Closed on time"
+            },
+            "operationalReliability": {
+                "otif": "95%",
+                "multiSiteRedundancy": true,
+                "supplyChainResilience": "High"
+            },
+            "financialStability": {
+                "ownership": "Public",
+                "financialReporting": "Audited",
+                "insuranceCoverage": "Comprehensive global"
+            }
+        },
+        {
+            "name": "Donsuemor Inc.",
+            "foodSafetyQuality": {
+                "gfsCertification": "SQF",
+                "allergenControls": "Validated",
+                "complaintRate": "Very low"
+            },
+            "regulatoryCompliance": {
+                "fdaInspections": "No enforcement actions",
+                "labelCompliance": "Verified annually"
+            },
+            "operationalReliability": {
+                "otif": "93%",
+                "capacityConstraints": "Holiday peaks"
+            },
+            "financialStability": {
+                "ownership": "Private",
+                "creditRisk": "Moderate"
+            }
+        },
+        {
+            "name": "Dean Foods",
+            "foodSafetyQuality": {
+                "pasteurizationVerification": "Continuous monitoring",
+                "environmentalTesting": "Routine",
+                "recallHistory": "None in last 3 years"
+            },
+            "regulatoryCompliance": {
+                "fdaUsdaInspections": "Routine and compliant",
+                "stateDairyPermits": "Active"
+            },
+            "operationalReliability": {
+                "coldChainMonitoring": "Continuous",
+                "otif": "96%",
+                "distributionNetwork": "Multi-state"
+            },
+            "financialStability": {
+                "ownership": "Private",
+                "insuranceCoverage": "Extensive dairy coverage"
+            }
+        },
+        {
+            "name": "Borden",
+            "foodSafetyQuality": {
+                "pasteurizationControls": "Validated",
+                "qualityTesting": "Batch-based verification",
+                "recallHistory": "None in last 3 years"
+            },
+            "regulatoryCompliance": {
+                "fdaUsdaInspections": "Compliant",
+                "labelingCompliance": "Verified"
+            },
+            "operationalReliability": {
+                "coldChainMonitoring": "Continuous",
+                "otif": "95%",
+                "regionalDistribution": "Multi-region"
+            },
+            "financialStability": {
+                "ownership": "Private",
+                "insuranceCoverage": "Dairy product liability"
+            }
+        },
+        {
+            "name": "Good & Gather",
+            "foodSafetyQuality": {
+                "pasteurizationVerification": "Verified through co-manufacturers",
+                "supplierAudits": "Annual",
+                "recallHistory": "None reported"
+            },
+            "regulatoryCompliance": {
+                "coManufacturerCompliance": "Verified",
+                "labelApproval": "Retail-approved"
+            },
+            "operationalReliability": {
+                "coldChainControls": "Retail managed",
+                "otif": "97%",
+                "supplyRedundancy": "Multiple co-manufacturers"
+            },
+            "financialStability": {
+                "ownership": "Retail private label",
+                "financialBacking": "Large national retailer"
+            }
+        },
+        {
+            "name": "PepsiCo",
+            "foodSafetyQuality": {
+                "gfsCertification": "Certified manufacturing sites",
+                "qualitySystems": "Advanced global systems"
+            },
+            "regulatoryCompliance": {
+                "regulatoryPrograms": "Global compliance programs",
+                "ethicalSourcing": "Established standards"
+            },
+            "operationalReliability": {
+                "otif": "98%",
+                "globalRedundancy": "Extensive",
+                "disasterRecovery": "Fully implemented"
+            },
+            "financialStability": {
+                "ownership": "Public",
+                "liquidity": "Strong",
+                "insuranceCoverage": "Extensive"
+            }
+        }
+    ]
+}
