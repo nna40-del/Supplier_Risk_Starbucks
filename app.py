@@ -3,6 +3,7 @@ import re
 from typing import Any, Dict, List
 
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 
@@ -28,8 +29,11 @@ ws_fs = 35
 ws_rc = 25
 ws_op = 25
 ws_fin = 15
-low_cut = 33
-med_cut = 66
+# risk score thresholds for categorization
+# low: 0-30, moderate: 31-50, high: 51-80, severe: 81-100
+low_cut = 30
+moderate_cut = 50
+high_cut = 80
 
 # Default column ordering
 default_cols = ["name", "risk_level", "risk_score", "risk_probability", "foodSafety", "regulatory", "operational", "financial"]
@@ -141,12 +145,15 @@ if uploaded_file is not None:
                     risk_probability = v_fs * w_fs + v_rc * w_rc + v_op * w_op + v_fin * w_fin
                     risk_probability = min(max(risk_probability, 0.0), 1.0)
                     risk_score = int(round(risk_probability * 100))
+                    # assign one of four risk levels based on configured thresholds
                     if risk_score <= low_cut:
                         risk_level = "LOW"
-                    elif risk_score <= med_cut:
-                        risk_level = "MEDIUM"
-                    else:
+                    elif risk_score <= moderate_cut:
+                        risk_level = "MODERATE"
+                    elif risk_score <= high_cut:
                         risk_level = "HIGH"
+                    else:
+                        risk_level = "SEVERE"
 
                     result = {
                         "name": s.get("name"),
@@ -197,15 +204,18 @@ if uploaded_file is not None:
             ordered = [c for c in col_order if c in df.columns]
             remaining = [c for c in df.columns if c not in ordered]
             df = df[ordered + remaining]
+            # remove default integer index so side numbers don't appear
+            display_df = df.reset_index(drop=True)
 
-            # Summary metrics
-            c1, c2, c3 = st.columns([1, 1, 1])
-            counts = df["risk_level"].value_counts().to_dict()
+            # Summary metrics (four categories)
+            c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+            counts = display_df["risk_level"].value_counts().to_dict()
             c1.metric("Low", counts.get("LOW", 0))
-            c2.metric("Medium", counts.get("MEDIUM", 0))
+            c2.metric("Moderate", counts.get("MODERATE", 0))
             c3.metric("High", counts.get("HIGH", 0))
+            c4.metric("Severe", counts.get("SEVERE", 0))
 
-            avg_score = df["risk_score"].mean() if not df.empty else 0
+            avg_score = display_df["risk_score"].mean() if not display_df.empty else 0
             st.markdown(f"**Average risk score:** {avg_score:.1f}")
 
             # Display an interactive table (AgGrid) if available, otherwise styled dataframe
@@ -221,17 +231,17 @@ if uploaded_file is not None:
                 from st_aggrid import AgGrid
                 from st_aggrid.grid_options_builder import GridOptionsBuilder
 
-                gb = GridOptionsBuilder.from_dataframe(df)
+                gb = GridOptionsBuilder.from_dataframe(display_df)
                 gb.configure_default_column(filter=True, sortable=True, resizable=True)
                 gb.configure_column("risk_score", type=["numericColumn", "numberColumnFilter"], width=110)
                 gb.configure_column("risk_probability", type=["numericColumn"], width=130)
                 grid_options = gb.build()
-                AgGrid(df, gridOptions=grid_options, fit_columns_on_grid_load=True, enable_enterprise_modules=False, height=480)
+                AgGrid(display_df, gridOptions=grid_options, fit_columns_on_grid_load=True, enable_enterprise_modules=False, height=480)
             except Exception:
                 st.info("For an interactive table with sorting and filters, install `st-aggrid` (pip install st-aggrid). Showing static table instead.")
-                st.dataframe(df.style.format(fmt).bar(subset=["risk_score"], color="#f63366"), use_container_width=True, height=480)
+                st.dataframe(df.style.format(fmt).bar(subset=["risk_score"], color="#f63366").hide(axis="index"), use_container_width=True, height=480)
             # Allow user to download scored results
-            csv = df.to_csv(index=False)
+            csv = display_df.to_csv(index=False)
             st.download_button("Download scored results (CSV)", csv, file_name="scored_suppliers.csv", mime="text/csv")
         except json.JSONDecodeError:
             st.error("Invalid JSON file. Please upload a valid .json document.")
