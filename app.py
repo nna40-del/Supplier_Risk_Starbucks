@@ -435,7 +435,7 @@ and financial distress, providing actionable risk scores and recommendations.
         if txt and txt.strip():
             articles_list = [{"id": 0, "text": txt.strip()}]
     else:
-        uploaded_news_file = st.file_uploader("Upload a JSON or TXT file with news articles", type=["json", "txt"], key="news_json")
+        uploaded_news_file = st.file_uploader("Upload a JSON, TXT or PDF file with news articles", type=["json", "txt", "pdf"], key="news_json")
         if uploaded_news_file is not None:
             try:
                 name = uploaded_news_file.name or "uploaded"
@@ -466,44 +466,44 @@ and financial distress, providing actionable risk scores and recommendations.
                 if not processed:
                     try:
                         news_data = json.loads(content_bytes.decode("utf-8"))
-                        # normalize to list of article texts
-                        if isinstance(news_data, dict):
-                            if "articles" in news_data and isinstance(news_data["articles"], list):
-                                for i, a in enumerate(news_data["articles"]):
-                                    if isinstance(a, dict):
-                                        text = a.get("text", a.get("content", json.dumps(a)))
-                                    else:
-                                        text = str(a)
-                                    if text and str(text).strip():
-                                        articles_list.append({"id": i, "text": str(text).strip()})
-                            elif "text" in news_data:
-                                text = news_data["text"]
-                                articles_list.append({"id": 0, "text": str(text).strip()})
-                            elif "content" in news_data:
-                                text = news_data["content"]
-                                articles_list.append({"id": 0, "text": str(text).strip()})
-                            else:
-                                # fallback: stringify and treat as single article
-                                articles_list.append({"id": 0, "text": json.dumps(news_data)})
-                        elif isinstance(news_data, list):
-                            for i, item in enumerate(news_data):
-                                if isinstance(item, dict):
-                                    text = item.get("text", item.get("content", json.dumps(item)))
+                    # normalize to list of article texts
+                    if isinstance(news_data, dict):
+                        if "articles" in news_data and isinstance(news_data["articles"], list):
+                            for i, a in enumerate(news_data["articles"]):
+                                if isinstance(a, dict):
+                                    text = a.get("text", a.get("content", json.dumps(a)))
                                 else:
-                                    text = str(item)
+                                    text = str(a)
                                 if text and str(text).strip():
                                     articles_list.append({"id": i, "text": str(text).strip()})
+                        elif "text" in news_data:
+                            text = news_data["text"]
+                            articles_list.append({"id": 0, "text": str(text).strip()})
+                        elif "content" in news_data:
+                            text = news_data["content"]
+                            articles_list.append({"id": 0, "text": str(text).strip()})
                         else:
-                            articles_list.append({"id": 0, "text": str(news_data)})
+                            # fallback: stringify and treat as single article
+                            articles_list.append({"id": 0, "text": json.dumps(news_data)})
+                    elif isinstance(news_data, list):
+                        for i, item in enumerate(news_data):
+                            if isinstance(item, dict):
+                                text = item.get("text", item.get("content", json.dumps(item)))
+                            else:
+                                text = str(item)
+                            if text and str(text).strip():
+                                articles_list.append({"id": i, "text": str(text).strip()})
+                    else:
+                        articles_list.append({"id": 0, "text": str(news_data)})
+                except Exception:
+                    # treat as plain text file; split into paragraphs by blank lines
+                    try:
+                        text = content_bytes.decode("utf-8")
                     except Exception:
-                        # treat as plain text file; split into paragraphs by blank lines
-                        try:
-                            text = content_bytes.decode("utf-8")
-                        except Exception:
-                            text = content_bytes.decode("latin-1")
-                        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
-                        for i, p in enumerate(paragraphs):
-                            articles_list.append({"id": i, "text": p})
+                        text = content_bytes.decode("latin-1")
+                    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+                    for i, p in enumerate(paragraphs):
+                        articles_list.append({"id": i, "text": p})
             except Exception:
                 st.error("❌ Invalid or unreadable file format")
 
