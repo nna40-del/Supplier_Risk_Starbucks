@@ -1,0 +1,57 @@
+{
+    "suppliers": [
+        {
+            "name": "Aurora Bean Logistics Ltd.",
+            "foodSafetyQuality": {
+                "gfsCertification": "SQF Level 2",
+                "lastAudit": "2025-11",
+                "recallHistory": "One Class II recall (2 years ago)",
+                "allergenControls": "Partially validated",
+                "customerComplaints": "1.8 per 10,000 units"
+            },
+            "regulatoryCompliance": {
+                "fdaInspections": "One open observation",
+                "supplierCodeOfConduct": "Signed",
+                "environmentalPermits": "Active",
+                "importExportCompliance": "Delayed customs documentation twice"
+            },
+            "operationalReliability": {
+                "otif": "91%",
+                "leadTime": "12-15 days",
+                "capacityUtilization": "89%",
+                "backupFacilities": 0,
+                "businessContinuityPlan": "Draft only"
+            },
+            "financialStability": {
+                "creditRisk": "Moderate",
+                "revenueTrend": "Declining last 2 quarters",
+                "insuranceCoverage": "General liability only",
+                "customerRevenueConcentration": "35%"
+            }
+        },
+        {
+            "name": "FGF Brands",
+            "foodSafetyQuality": {
+                "gfsCertification": "SQF Level 3",
+                "lastAudit": "2025-06",
+                "recallHistory": "None in last 5 years",
+                "allergenControls": "Documented and validated"
+            },
+            "regulatoryCompliance": {
+                "fdaInspections": "No 483s in last 3 inspections",
+                "supplierCodeOfConduct": "Signed and current",
+                "environmentalPermits": "Active, no violations"
+            },
+            "operationalReliability": {
+                "otif": "97%",
+                "leadTime": "7-10 days",
+                "backupFacilities": 2
+            },
+            "financialStability": {
+                "creditRisk": "Low (internal assessment)",
+                "revenueTrend": "Stable YoY",
+                "insuranceCoverage": "Product liability and recall"
+            }
+        }
+    ]
+}
