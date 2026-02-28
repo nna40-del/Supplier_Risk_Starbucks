@@ -1,6 +1,7 @@
 import json
 import re
 from typing import Any, Dict, List
+from pathlib import Path
 
 import io
 import pandas as pd
@@ -22,6 +23,8 @@ st.set_page_config(
     page_icon="📦",
     layout="wide",
 )
+
+DB_FILE = Path(__file__).with_name("data.json")
 
 st.title("🚨 Supplier Risk Scoring & News Analysis")
 st.caption("Upload JSON files with supplier data or paste news articles to assess supply chain risks.")
@@ -64,6 +67,38 @@ The system will score them based on food safety, regulatory, operational, and fi
         if st.button("Submit JSON", type="primary", key="submit_supplier"):
             try:
                 parsed_json = json.load(uploaded_file)
+                uploaded_suppliers = parsed_json.get("suppliers") if isinstance(parsed_json, dict) else None
+                if not isinstance(uploaded_suppliers, list):
+                    st.error("❌ Uploaded JSON must include a top-level 'suppliers' list.")
+                    st.stop()
+
+                def _normalize_name(name: Any) -> str:
+                    return str(name or "").strip().lower()
+
+                # Read current supplier database to identify truly new suppliers
+                db_payload: Dict[str, Any] = {"suppliers": []}
+                existing_suppliers: List[Dict[str, Any]] = []
+                if DB_FILE.exists():
+                    try:
+                        with DB_FILE.open("r", encoding="utf-8") as f:
+                            db_payload = json.load(f)
+                        existing_suppliers = db_payload.get("suppliers", []) if isinstance(db_payload, dict) else []
+                        if not isinstance(existing_suppliers, list):
+                            existing_suppliers = []
+                    except Exception:
+                        existing_suppliers = []
+
+                existing_names = {_normalize_name(s.get("name")) for s in existing_suppliers if isinstance(s, dict)}
+                new_supplier_inputs: List[Dict[str, Any]] = []
+                for supplier in uploaded_suppliers:
+                    if not isinstance(supplier, dict):
+                        continue
+                    name_key = _normalize_name(supplier.get("name"))
+                    if not name_key:
+                        continue
+                    if name_key not in existing_names:
+                        new_supplier_inputs.append(supplier)
+                        existing_names.add(name_key)
 
                 def _parse_pct(s: Any) -> float:
                     if s is None:
@@ -189,6 +224,7 @@ The system will score them based on food safety, regulatory, operational, and fi
 
                 weights = {"fs": ws_fs, "rc": ws_rc, "op": ws_op, "fin": ws_fin}
                 scored = compute_supplier_risks(parsed_json, weights)
+                new_supplier_name_keys = {_normalize_name(s.get("name")) for s in new_supplier_inputs}
 
                 print("\n=== Supply Risk JSON Submission (scored) ===")
                 print(f"Filename: {uploaded_file.name}")
@@ -235,6 +271,55 @@ The system will score them based on food safety, regulatory, operational, and fi
 
                 avg_score = display_df["risk_score"].mean() if not display_df.empty else 0
                 st.markdown(f"**Average risk score:** {avg_score:.1f} / 100")
+
+                # Dedicated assessment for suppliers that are not yet in database
+                if new_supplier_name_keys:
+                    st.markdown("### 🆕 Candidate Supplier Risk Assessment (Not Yet in Database)")
+                    new_rows = [
+                        row for row in rows
+                        if _normalize_name(row.get("name")) in new_supplier_name_keys
+                    ]
+                    if new_rows:
+                        new_df = pd.DataFrame(new_rows)
+                        st.dataframe(new_df, use_container_width=True, hide_index=True)
+                        severe_count = int((new_df["risk_level"] == "SEVERE").sum())
+                        high_count = int((new_df["risk_level"] == "HIGH").sum())
+                        if severe_count > 0:
+                            st.error(f"⚠️ {severe_count} new supplier(s) assessed as SEVERE risk.")
+                        elif high_count > 0:
+                            st.warning(f"⚠️ {high_count} new supplier(s) assessed as HIGH risk.")
+                        else:
+                            st.success("✅ New supplier candidates assessed as LOW/MODERATE risk.")
+
+                    # Persist only newly discovered suppliers into the local database
+                    try:
+                        fresh_existing = db_payload.get("suppliers", []) if isinstance(db_payload, dict) else []
+                        if not isinstance(fresh_existing, list):
+                            fresh_existing = []
+                        fresh_existing_names = {
+                            _normalize_name(s.get("name"))
+                            for s in fresh_existing
+                            if isinstance(s, dict)
+                        }
+                        append_list: List[Dict[str, Any]] = []
+                        for supplier in new_supplier_inputs:
+                            supplier_name_key = _normalize_name(supplier.get("name"))
+                            if supplier_name_key and supplier_name_key not in fresh_existing_names:
+                                append_list.append(supplier)
+                                fresh_existing_names.add(supplier_name_key)
+
+                        if append_list:
+                            fresh_existing.extend(append_list)
+                            db_payload["suppliers"] = fresh_existing
+                            with DB_FILE.open("w", encoding="utf-8") as f:
+                                json.dump(db_payload, f, indent=4, ensure_ascii=False)
+                            st.success(f"💾 Added {len(append_list)} new supplier profile(s) to database.")
+                        else:
+                            st.info("ℹ️ No additional supplier profiles were added to database.")
+                    except Exception as persist_err:
+                        st.warning(f"⚠️ Risk assessment completed, but failed to update database: {persist_err}")
+                else:
+                    st.info("ℹ️ All uploaded suppliers already exist in database; no new profiles added.")
 
                 # Display an interactive table (AgGrid) if available, otherwise styled dataframe
                 fmt = {
@@ -381,44 +466,44 @@ and financial distress, providing actionable risk scores and recommendations.
                 if not processed:
                     try:
                         news_data = json.loads(content_bytes.decode("utf-8"))
-                    # normalize to list of article texts
-                    if isinstance(news_data, dict):
-                        if "articles" in news_data and isinstance(news_data["articles"], list):
-                            for i, a in enumerate(news_data["articles"]):
-                                if isinstance(a, dict):
-                                    text = a.get("text", a.get("content", json.dumps(a)))
+                        # normalize to list of article texts
+                        if isinstance(news_data, dict):
+                            if "articles" in news_data and isinstance(news_data["articles"], list):
+                                for i, a in enumerate(news_data["articles"]):
+                                    if isinstance(a, dict):
+                                        text = a.get("text", a.get("content", json.dumps(a)))
+                                    else:
+                                        text = str(a)
+                                    if text and str(text).strip():
+                                        articles_list.append({"id": i, "text": str(text).strip()})
+                            elif "text" in news_data:
+                                text = news_data["text"]
+                                articles_list.append({"id": 0, "text": str(text).strip()})
+                            elif "content" in news_data:
+                                text = news_data["content"]
+                                articles_list.append({"id": 0, "text": str(text).strip()})
+                            else:
+                                # fallback: stringify and treat as single article
+                                articles_list.append({"id": 0, "text": json.dumps(news_data)})
+                        elif isinstance(news_data, list):
+                            for i, item in enumerate(news_data):
+                                if isinstance(item, dict):
+                                    text = item.get("text", item.get("content", json.dumps(item)))
                                 else:
-                                    text = str(a)
+                                    text = str(item)
                                 if text and str(text).strip():
                                     articles_list.append({"id": i, "text": str(text).strip()})
-                        elif "text" in news_data:
-                            text = news_data["text"]
-                            articles_list.append({"id": 0, "text": str(text).strip()})
-                        elif "content" in news_data:
-                            text = news_data["content"]
-                            articles_list.append({"id": 0, "text": str(text).strip()})
                         else:
-                            # fallback: stringify and treat as single article
-                            articles_list.append({"id": 0, "text": json.dumps(news_data)})
-                    elif isinstance(news_data, list):
-                        for i, item in enumerate(news_data):
-                            if isinstance(item, dict):
-                                text = item.get("text", item.get("content", json.dumps(item)))
-                            else:
-                                text = str(item)
-                            if text and str(text).strip():
-                                articles_list.append({"id": i, "text": str(text).strip()})
-                    else:
-                        articles_list.append({"id": 0, "text": str(news_data)})
-                except Exception:
-                    # treat as plain text file; split into paragraphs by blank lines
-                    try:
-                        text = content_bytes.decode("utf-8")
+                            articles_list.append({"id": 0, "text": str(news_data)})
                     except Exception:
-                        text = content_bytes.decode("latin-1")
-                    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
-                    for i, p in enumerate(paragraphs):
-                        articles_list.append({"id": i, "text": p})
+                        # treat as plain text file; split into paragraphs by blank lines
+                        try:
+                            text = content_bytes.decode("utf-8")
+                        except Exception:
+                            text = content_bytes.decode("latin-1")
+                        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+                        for i, p in enumerate(paragraphs):
+                            articles_list.append({"id": i, "text": p})
             except Exception:
                 st.error("❌ Invalid or unreadable file format")
 
