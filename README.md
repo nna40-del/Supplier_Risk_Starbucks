@@ -1,14 +1,140 @@
-# Supplier News Risk Scoring Module
+# How the Supplier News Risk Scoring AI Works (Simple Explanation)
 
-A production-ready Python module for NLP-based supplier news risk scoring. This system analyzes raw news articles and generates quantitative risk assessments across four key themes relevant to supply chain management: **labor violations**, **environmental damage**, **political instability**, and **financial distress**.
+Think of this AI system as a **news analyst for Starbucks' suppliers**. It reads news articles about your suppliers and tells you if there are red flags that could disrupt your coffee supply chain.
 
-## Features
+## The Big Picture
 
-- ✅ **Fully Offline** – Uses local sentence-transformers embeddings; no external API keys or credentials required
-- ✅ **Production-Ready** – Clear error handling, modular design, FastAPI-compatible
-- ✅ **Fast & Lightweight** – All-MiniLM-L6-v2 model runs efficiently on standard hardware
-- ✅ **Comprehensive Scoring** – Sentiment analysis, theme-specific keyword detection, embedding similarity, and aggregated risk scoring
-- ✅ **Customizable** – Override theme keywords, embedding models, or weighting schemes easily
+Imagine you have a coffee supplier in Brazil. One day, a news article comes out saying:
+
+> "Factory closes after environmental violations. Workers staged a strike over unsafe conditions. Company faces bankruptcy risk."
+
+The AI reads this article and asks itself: **"How risky is this supplier right now?"** Then it gives you a score from 0 to 100.
+- **0–30** = Low risk (probably fine)
+- **31–50** = Moderate risk (pay attention)
+- **51–80** = High risk (serious problems)
+- **81–100** = Severe risk (major trouble)
+
+---
+
+## How It Works (Like a Detective)
+
+The AI acts like a trained detective investigating a supplier. It looks for clues:
+
+### 1. **What's the Mood of the Article?** (Sentiment)
+The AI reads the tone of the article—is it positive or negative?
+- Positive tone = Good news → Lower risk
+- Negative tone = Bad news → Higher risk
+
+It's like if I told you, "The factory is thriving!" vs. "The factory is collapsing!"
+
+### 2. **What Problems Are Mentioned?** (Risk Themes)
+The AI looks for specific danger words in four categories:
+
+| Category | Warning Signs |
+|----------|---------------|
+| **Labor Violations** | strike, union dispute, worker injury, unsafe conditions |
+| **Environmental Damage** | pollution, spill, waste, contamination |
+| **Political Instability** | protest, sanction, military unrest |
+| **Financial Distress** | bankruptcy, debt, credit rating downgrade |
+
+When it finds these keywords, it's like finding clues at a crime scene. **More clues = bigger problem.**
+
+### 3. **How Intense Are the Problems?** (Keyword Density)
+The AI counts how many risk keywords appear **relative to article length**.
+
+Example:
+- Article A: "Strike. Pollution. Bankruptcy." (3 risk words in 3 words = 100% risk)
+- Article B: "The company is doing well. There was a minor strike reported by local media." (1 risk word in ~15 words = 7% risk)
+
+Article A is clearly more concerning.
+
+### 4. **Is This Similar to Past Disasters?** (Embedding Similarity)
+This is the trickiest part, but stay with me.
+
+Imagine you have a mental catalog of **past supply chain disasters** in your memory. When a new article comes in, the AI asks: **"Does this article sound like one of those disasters?"**
+
+It doesn't look for exact word matches. Instead, it looks for **similar meaning and context**. Here's an analogy:
+
+- Past disaster: "Factory flooded, causing production shutdown"
+- New article: "Water damage forces facility closure"
+
+These are **different words** but **same meaning**. The AI would recognize they're similar.
+
+It does this using something called an **embedding**—think of it as a unique fingerprint of what an article is about. If the fingerprint matches past disaster fingerprints, that's a red flag.
+
+### 5. **Add It All Up** (Overall Score)
+The AI combines all these clues into one number (0–100):
+
+```
+Final Risk Score = (Negative Sentiment × 25) + (Theme Score × 25) + (Keyword Intensity × 25) + (Disaster Similarity × 25)
+```
+
+In plain English:
+- Sentiment matters 25%
+- What problems are mentioned matters 25%
+- How intense those problems are matters 25%
+- Is it similar to past disasters matters 25%
+
+---
+
+## A Real-World Example
+
+**Sample Article:**
+> "A major factory was forced to close after pollution complaints. Workers staged a strike as management failed to meet safety demands. The company is facing mounting debt and rumors of bankruptcy."
+
+**What the AI Finds:**
+
+✅ **Sentiment:** Negative (-0.25 on scale of -1 to +1)
+
+✅ **Risk Themes Detected:**
+- Labor violations: Found keywords "strike," "safety demands"
+- Environmental damage: Found keyword "pollution"
+- Financial distress: Found keywords "debt," "bankruptcy"
+- Political instability: None found
+
+✅ **Keyword Intensity:** 5 risk words in ~30 total words = about 13% intensity
+
+✅ **Disaster Similarity:** Compares to past crisis cases = slight match
+
+✅ **Final Score:** **9.81 out of 100**
+
+**Translation:** Low-to-moderate risk. The supplier has real problems, but they're not catastrophic yet. Starbucks should monitor the situation but doesn't need to panic.
+
+---
+
+## Why This Matters for Starbucks
+
+Instead of having a person manually read thousands of news articles every day, the AI does it automatically. It's like having a tireless news analyst who:
+
+- ✅ Never sleeps
+- ✅ Never misses an article
+- ✅ Always applies the same criteria
+- ✅ Warns you immediately when a supplier becomes risky
+- ✅ Identifies patterns you might miss
+
+This helps Starbucks **prevent supply shocks**—if a coffee supplier is having problems, you find out before your stores run out of beans.
+
+---
+
+## Where Does the Intelligence Come From?
+
+The AI doesn't "think" the way humans do. Instead, it uses two key tricks:
+
+### 1. **Pre-Built Knowledge (Keywords)**
+We taught it by saying: "These words usually mean labor problems. These words usually mean environmental problems." The AI just counts them.
+
+### 2. **Pattern Recognition (Embeddings)**
+We gave it a smart model trained on millions of articles. This model learned to recognize **meaning** beyond just words. So it can tell that "factory closure" and "facility shutdown" mean the same thing, even though they use different words.
+
+The model itself (all-MiniLM-L6-v2) is **pre-trained** — it came from a library of AI models. We don't need to train it ourselves; we just use it offline in your system.
+
+---
+
+## No Internet, No Secrets
+
+⚠️ **Important:** This AI runs **entirely on your computer**. It doesn't send your supplier data anywhere—no cloud, no API, no external companies. It's all private and secure.
+
+---
 
 ## Installation
 
@@ -18,7 +144,7 @@ A production-ready Python module for NLP-based supplier news risk scoring. This 
 
 ### Setup
 
-1. **Clone or navigate to the workspace:**
+1. **Navigate to the workspace:**
    ```bash
    cd /workspaces/blank-app
    ```
@@ -43,374 +169,17 @@ A production-ready Python module for NLP-based supplier news risk scoring. This 
 python supplier_news_risk.py
 ```
 
-This will score a sample article and print JSON output:
+This will score a sample article and print results showing the risk score and breakdown.
 
-```json
-{
-  "sentiment_score": -0.246,
-  "theme_scores": {
-    "labor_violations": 0.032,
-    "environmental_damage": 0.032,
-    "political_instability": 0.0,
-    "financial_distress": 0.065
-  },
-  "keyword_intensity_score": 0.129,
-  "disruption_similarity_score": -0.015,
-  "overall_news_risk_score": 9.81
-}
-```
+---
 
-## Testing
+## In Summary
 
-### 1. **Interactive Testing in Python**
+**The AI is like a hyperintelligent, always-on news scanner for your suppliers that:**
+1. Reads articles
+2. Detects bad news
+3. Compares patterns to past crises
+4. Gives you a risk score
+5. Helps you avoid supply chain disasters
 
-```bash
-source /workspaces/blank-app/.venv/bin/activate
-python
-```
-
-Then in the Python REPL:
-
-```python
-from supplier_news_risk import score_article
-
-# Test with a custom article
-article_text = """
-Factory closure raises environmental concerns after pollution incident.
-Union files complaint over unsafe working conditions.
-Company faces potential credit downgrade due to mounting debt.
-"""
-
-result = score_article(article_text)
-
-# Print structured output
-import json
-print(json.dumps(result.to_dict(), indent=2))
-
-# Access individual metrics
-print(f"Overall Risk: {result.overall_news_risk_score}/100")
-print(f"Sentiment: {result.sentiment_score}")
-print(f"Theme Scores: {result.theme_scores}")
-```
-
-### 2. **Batch Testing with File Input**
-
-Create a test file `test_articles.txt` with sample news articles (one per line or separated by blank lines), then:
-
-```python
-from supplier_news_risk import score_article
-import json
-
-# Read and score articles
-with open("test_articles.txt", "r") as f:
-    articles = f.read().split("\n\n")
-
-results = []
-for idx, article in enumerate(articles):
-    if article.strip():
-        try:
-            result = score_article(article)
-            results.append({
-                "article_id": idx,
-                "risk_score": result.overall_news_risk_score,
-                "sentiment": result.sentiment_score,
-                "themes": result.theme_scores
-            })
-        except Exception as e:
-            print(f"Error scoring article {idx}: {e}")
-
-# Save results
-with open("scoring_results.json", "w") as f:
-    json.dump(results, f, indent=2)
-print(f"Scored {len(results)} articles. Results saved to scoring_results.json")
-```
-
-### 3. **Test Individual Scoring Components**
-
-```python
-from supplier_news_risk import (
-    sentiment_score,
-    keyword_intensity_score,
-    theme_scores,
-    generate_embedding,
-    disruption_similarity_score,
-    THEME_KEYWORDS
-)
-
-text = "Workers strike over safety violations. Facility faces environmental cleanup."
-
-# Test sentiment
-print(f"Sentiment: {sentiment_score(text)}")
-
-# Test keyword intensity (overall)
-print(f"Keyword Intensity: {keyword_intensity_score(text, THEME_KEYWORDS)}")
-
-# Test per-theme keyword scores
-print(f"Theme Scores: {theme_scores(text, THEME_KEYWORDS)}")
-
-# Test embedding generation (first call downloads model ~90MB)
-embedding = generate_embedding(text)
-print(f"Embedding shape: {len(embedding)} dimensions")
-
-# Test similarity to historical disruptions
-dummy_historical = [
-    [0.1] * 384,
-    [0.2] * 384,
-]
-similarity = disruption_similarity_score(embedding, dummy_historical)
-print(f"Disruption Similarity: {similarity}")
-```
-
-### 4. **Unit Test Suite (pytest)**
-
-Create a file named `test_supplier_risk.py`:
-
-```python
-import pytest
-from supplier_news_risk import (
-    score_article,
-    sentiment_score,
-    keyword_intensity_score,
-    theme_scores,
-    THEME_KEYWORDS,
-)
-
-
-def test_empty_input_raises_error():
-    """Test that empty input raises ValueError."""
-    with pytest.raises(ValueError):
-        score_article("")
-
-
-def test_whitespace_only_input_raises_error():
-    """Test that whitespace-only input raises ValueError."""
-    with pytest.raises(ValueError):
-        score_article("   \n  \t  ")
-
-
-def test_sentiment_positive_text():
-    """Test sentiment scoring on positive news."""
-    text = "Company thrives with record profits and happy employees."
-    result = sentiment_score(text)
-    assert result > 0, "Positive text should have positive sentiment"
-
-
-def test_sentiment_negative_text():
-    """Test sentiment scoring on negative news."""
-    text = "Facility shutdown due to safety violations and environmental damage."
-    result = sentiment_score(text)
-    assert result < 0, "Negative text should have negative sentiment"
-
-
-def test_labor_violation_keywords():
-    """Test detection of labor violation keywords."""
-    text = "Workers staged a strike due to unsafe labor conditions."
-    themes = theme_scores(text, THEME_KEYWORDS)
-    assert themes["labor_violations"] > 0, "Labor keywords should be detected"
-
-
-def test_environmental_keywords():
-    """Test detection of environmental damage keywords."""
-    text = "Chemical spill caused severe pollution in the region."
-    themes = theme_scores(text, THEME_KEYWORDS)
-    assert themes["environmental_damage"] > 0, "Environmental keywords should be detected"
-
-
-def test_financial_keywords():
-    """Test detection of financial distress keywords."""
-    text = "Company faces bankruptcy risk and credit default concerns."
-    themes = theme_scores(text, THEME_KEYWORDS)
-    assert themes["financial_distress"] > 0, "Financial keywords should be detected"
-
-
-def test_multiple_themes():
-    """Test detection across multiple themes."""
-    text = """
-    Factory closure announced after environmental violations.
-    Union files labor dispute claim. Company defaulted on debt obligations.
-    """
-    themes = theme_scores(text, THEME_KEYWORDS)
-    non_zero_themes = sum(1 for score in themes.values() if score > 0)
-    assert non_zero_themes >= 2, "Multiple themes should be detected"
-
-
-def test_overall_risk_score_range():
-    """Test that overall risk score is within [0, 100]."""
-    text = "Some neutral business news about supplier operations."
-    result = score_article(text)
-    assert 0 <= result.overall_news_risk_score <= 100, "Risk score should be in [0, 100]"
-
-
-def test_complete_result_structure():
-    """Test that the result contains all required fields."""
-    text = "Test article for comprehensive risk assessment."
-    result = score_article(text)
-    
-    assert hasattr(result, "sentiment_score")
-    assert hasattr(result, "theme_scores")
-    assert hasattr(result, "keyword_intensity_score")
-    assert hasattr(result, "disruption_similarity_score")
-    assert hasattr(result, "overall_news_risk_score")
-    
-    # Verify theme_scores is a dict with all expected themes
-    assert isinstance(result.theme_scores, dict)
-    assert set(result.theme_scores.keys()) == {
-        "labor_violations",
-        "environmental_damage",
-        "political_instability",
-        "financial_distress",
-    }
-
-
-if __name__ == "__main__":
-    # Run with: pytest test_supplier_risk.py -v
-    pytest.main([__file__, "-v"])
-```
-
-**Run the tests:**
-
-```bash
-pip install pytest
-pytest test_supplier_risk.py -v
-```
-
-Expected output:
-```
-test_supplier_risk.py::test_empty_input_raises_error PASSED
-test_supplier_risk.py::test_sentiment_positive_text PASSED
-test_supplier_risk.py::test_labor_violation_keywords PASSED
-...
-======================== 10 passed in 2.35s ========================
-```
-
-### 5. **FastAPI Integration Test**
-
-Create a file named `test_api.py`:
-
-```python
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from supplier_news_risk import score_article
-
-app = FastAPI(title="Supplier Risk Scoring API")
-
-
-class ArticlePayload(BaseModel):
-    text: str
-
-
-@app.post("/score_news")
-async def score_news(payload: ArticlePayload):
-    """Score a news article for supplier risk."""
-    if not payload.text.strip():
-        raise HTTPException(status_code=400, detail="Text cannot be empty")
-    try:
-        result = score_article(payload.text)
-        return result.to_dict()
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-
-
-# Run with: uvicorn test_api:app --reload
-# Then test with: curl -X POST "http://localhost:8000/score_news" \
-#   -H "Content-Type: application/json" \
-#   -d '{"text": "Factory closes after pollution incidents."}'
-```
-
-Install and run:
-```bash
-pip install fastapi uvicorn
-uvicorn test_api:app --reload
-```
-
-Test the endpoint:
-```bash
-curl -X POST "http://localhost:8000/score_news" \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Workers stage strike over unsafe labor conditions. Facility faces environmental damage lawsuit."}'
-```
-
-## Module API Reference
-
-### `score_article(text, historical_embeddings=None, theme_keywords=None) → NewsRiskResult`
-
-**Main entry point.** Analyzes raw article text and returns a comprehensive risk assessment.
-
-**Parameters:**
-- `text` (str, required): Raw news article text
-- `historical_embeddings` (List[List[float]], optional): Pre-computed embeddings of past disruption cases for similarity comparison
-- `theme_keywords` (Dict[str, List[str]], optional): Custom keyword dictionary; defaults to `THEME_KEYWORDS`
-
-**Returns:** `NewsRiskResult` dataclass with fields:
-- `sentiment_score`: Float [-1, 1]
-- `theme_scores`: Dict with scores for each risk theme
-- `keyword_intensity_score`: Float [0, 1]
-- `disruption_similarity_score`: Float (typically [0, 1])
-- `overall_news_risk_score`: Float [0, 100]
-
-**Example:**
-```python
-result = score_article("Factory closure due to environmental violations.")
-print(result.overall_news_risk_score)  # 42.15
-```
-
-### `generate_embedding(text) → List[float]`
-
-Generate a semantic embedding (384 dimensions) for the input text using the local all-MiniLM-L6-v2 model.
-
-### `sentiment_score(text) → float`
-
-Return normalized sentiment polarity in [-1, 1] using TextBlob.
-
-### `theme_scores(text, theme_keywords) → Dict[str, float]`
-
-Return frequency-normalized keyword hits per theme.
-
-### `keyword_intensity_score(text, theme_keywords) → float`
-
-Return overall keyword intensity [0, 1] across all themes.
-
-### `disruption_similarity_score(embedding, historical_embeddings) → float`
-
-Return maximum cosine similarity between embedding and historical cases.
-
-## Configuration
-
-The module uses sensible defaults and requires no configuration. To customize:
-
-```python
-from supplier_news_risk import score_article, THEME_KEYWORDS
-
-# Use custom keywords
-custom_keywords = {
-    "labor_violations": ["strike", "unsafe", "injury"],
-    "environmental_damage": ["spill", "pollution"],
-    "political_instability": ["protest", "sanction"],
-    "financial_distress": ["bankruptcy", "debt"],
-}
-
-result = score_article(text, theme_keywords=custom_keywords)
-```
-
-## Performance Notes
-
-- **First run:** ~15–30 seconds (downloads 90MB sentence-transformers model)
-- **Subsequent runs:** <1 second per article (model cached in memory)
-- **Memory:** ~300MB for model in memory + ~10MB per batch of 1000 embeddings
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| `ModuleNotFoundError: textblob` | Run `pip install textblob numpy sentence-transformers` |
-| `Model download fails` | Ensure internet connectivity; `sentence-transformers` will cache the model in `~/.cache/huggingface` |
-| `Embedding dimensions mismatch` | all-MiniLM-L6-v2 produces 384-d embeddings; ensure historical embeddings match |
-| `Slow first execution` | Normal—model downloads and caches on first call; subsequent calls are fast |
-
-## License
-
-Configured for Starbucks supply chain risk assessment. Modify and deploy as needed for your supply chain context.
-
-## Support
-
-For issues or enhancements, refer to the docstrings in `supplier_news_risk.py` or reach out to the development team.
+No magic, no secrets—just smart pattern matching and keyword counting, powered by modern machine learning.
