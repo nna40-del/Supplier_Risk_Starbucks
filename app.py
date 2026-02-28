@@ -2,12 +2,19 @@ import json
 import re
 from typing import Any, Dict, List
 
+import io
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 # Import the news risk scoring module
 from supplier_news_risk import score_article
+
+# optional PDF support
+try:
+    import PyPDF2
+except Exception:  # pragma: no cover - optional dependency
+    PyPDF2 = None
 
 
 st.set_page_config(
@@ -327,197 +334,184 @@ and financial distress, providing actionable risk scores and recommendations.
         }
     }
 
-    # Two input methods: upload JSON or paste text
-    input_method = st.radio("Choose input method:", ["📄 Paste News Article", "📁 Upload JSON File"])
+    # Two input methods: paste text, upload JSON or TXT files
+    input_method = st.radio("Choose input method:", ["📄 Paste News Article", "📁 Upload File (JSON or TXT)"])
 
-    article_text = None
+    articles_list: List[Dict[str, Any]] = []
 
     if input_method == "📄 Paste News Article":
         st.markdown("#### Paste your news article below:")
-        article_text = st.text_area(
+        txt = st.text_area(
             "News Article Content:",
             height=200,
             placeholder="Paste the full text of a news article about a supplier...",
             key="news_text"
         )
+        if txt and txt.strip():
+            articles_list = [{"id": 0, "text": txt.strip()}]
     else:
-        uploaded_news_file = st.file_uploader("Upload a JSON file with news articles or supplier text", type=["json"], key="news_json")
+        uploaded_news_file = st.file_uploader("Upload a JSON or TXT file with news articles", type=["json", "txt"], key="news_json")
         if uploaded_news_file is not None:
             try:
-                news_data = json.load(uploaded_news_file)
-                # Try to extract text from common JSON structures
-                if isinstance(news_data, dict):
-                    if "articles" in news_data and isinstance(news_data["articles"], list):
-                        article_text = " ".join([str(a.get("text", a.get("content", ""))) for a in news_data["articles"]])
-                    elif "text" in news_data:
-                        article_text = news_data["text"]
-                    elif "content" in news_data:
-                        article_text = news_data["content"]
+                name = uploaded_news_file.name or "uploaded"
+                content_bytes = uploaded_news_file.read()
+                # handle PDF files explicitly
+                processed = False
+                if name.lower().endswith(".pdf"):
+                    if PyPDF2 is None:
+                        st.error("PDF support requires PyPDF2. Install it with `pip install PyPDF2`.")
+                        processed = True
                     else:
-                        article_text = json.dumps(news_data)
-                elif isinstance(news_data, list):
-                    article_text = " ".join([str(item) for item in news_data])
+                        try:
+                            reader = PyPDF2.PdfReader(io.BytesIO(content_bytes))
+                            pages = []
+                            for p in reader.pages:
+                                page_text = p.extract_text() or ""
+                                pages.append(page_text)
+                            text = "\n".join(pages)
+                            paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+                            for i, p in enumerate(paragraphs):
+                                articles_list.append({"id": i, "text": p})
+                            processed = True
+                        except Exception:
+                            st.error("Failed to parse PDF content.")
+                            processed = True
+
+                # try JSON first (unless PDF already processed)
+                if not processed:
+                    try:
+                        news_data = json.loads(content_bytes.decode("utf-8"))
+                    # normalize to list of article texts
+                    if isinstance(news_data, dict):
+                        if "articles" in news_data and isinstance(news_data["articles"], list):
+                            for i, a in enumerate(news_data["articles"]):
+                                if isinstance(a, dict):
+                                    text = a.get("text", a.get("content", json.dumps(a)))
+                                else:
+                                    text = str(a)
+                                if text and str(text).strip():
+                                    articles_list.append({"id": i, "text": str(text).strip()})
+                        elif "text" in news_data:
+                            text = news_data["text"]
+                            articles_list.append({"id": 0, "text": str(text).strip()})
+                        elif "content" in news_data:
+                            text = news_data["content"]
+                            articles_list.append({"id": 0, "text": str(text).strip()})
+                        else:
+                            # fallback: stringify and treat as single article
+                            articles_list.append({"id": 0, "text": json.dumps(news_data)})
+                    elif isinstance(news_data, list):
+                        for i, item in enumerate(news_data):
+                            if isinstance(item, dict):
+                                text = item.get("text", item.get("content", json.dumps(item)))
+                            else:
+                                text = str(item)
+                            if text and str(text).strip():
+                                articles_list.append({"id": i, "text": str(text).strip()})
+                    else:
+                        articles_list.append({"id": 0, "text": str(news_data)})
+                except Exception:
+                    # treat as plain text file; split into paragraphs by blank lines
+                    try:
+                        text = content_bytes.decode("utf-8")
+                    except Exception:
+                        text = content_bytes.decode("latin-1")
+                    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+                    for i, p in enumerate(paragraphs):
+                        articles_list.append({"id": i, "text": p})
+            except Exception:
+                st.error("❌ Invalid or unreadable file format")
+
+    if articles_list and st.button("🔍 Analyze Article(s) for Risk", type="primary", key="analyze_news"):
+        try:
+            with st.spinner("🤖 AI is analyzing the article(s)..."):
+                # Score each article and collect results
+                batch_results: List[Dict[str, Any]] = []
+                for entry in articles_list:
+                    text = entry.get("text", "")
+                    if not text or not str(text).strip():
+                        continue
+                    res = score_article(text)
+                    score_val = res.overall_news_risk_score
+                    if score_val <= 30:
+                        level = "LOW"
+                    elif score_val <= 50:
+                        level = "MODERATE"
+                    elif score_val <= 80:
+                        level = "HIGH"
+                    else:
+                        level = "SEVERE"
+                    rec = RISK_RECOMMENDATIONS[level]
+                    batch_results.append({
+                        "id": entry.get("id"),
+                        "excerpt": (text[:120] + "...") if len(text) > 120 else text,
+                        "overall_risk_score": score_val,
+                        "risk_level": level,
+                        "recommendation": rec["recommendation"],
+                        "sentiment_score": res.sentiment_score,
+                        "keyword_intensity_score": res.keyword_intensity_score,
+                        "disruption_similarity_score": res.disruption_similarity_score,
+                        "theme_scores": res.theme_scores,
+                        "raw_results": res.to_dict(),
+                    })
+
+                # If multiple articles, show a batch table; if only one, show detailed view
+                if len(batch_results) == 0:
+                    st.warning("No valid articles found to analyze.")
+                elif len(batch_results) == 1:
+                    single = batch_results[0]
+                    res = single["raw_results"]
+                    risk_score = single["overall_risk_score"]
+                    risk_level = single["risk_level"]
+                    rec = RISK_RECOMMENDATIONS[risk_level]
+
+                    st.markdown("---")
+                    st.markdown("### 📊 Risk Assessment Results")
+                    col1, col2 = st.columns([2, 3])
+                    with col1:
+                        st.metric("Overall Risk Score", f"{risk_score:.1f}/100")
+                    with col2:
+                        st.markdown(f"### {rec['emoji']} {rec['description']}")
+
+                    # show same detailed breakdown as before
+                    st.markdown("### 🔍 Detailed Analysis")
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Sentiment Score", f"{res['sentiment_score']:.3f}")
+                    with col2:
+                        st.metric("Keyword Intensity", f"{res['keyword_intensity_score']:.3f}")
+                    with col3:
+                        st.metric("Disruption Similarity", f"{res['disruption_similarity_score']:.3f}")
+
+                    theme_df = pd.DataFrame([{"Theme": k.replace("_", " ").title(), "Score": v} for k, v in res['theme_scores'].items()])
+                    theme_df = theme_df.sort_values("Score", ascending=False).reset_index(drop=True)
+                    st.plotly_chart(go.Figure(go.Bar(x=theme_df['Theme'], y=theme_df['Score'])), use_container_width=True)
+                    st.dataframe(theme_df.style.bar(subset=["Score"], color="#fd7e14"), use_container_width=True, hide_index=True)
+
+                    st.markdown("### 📄 Raw JSON Output")
+                    with st.expander("Click to expand raw results"):
+                        st.json(res)
+
+                    st.download_button("📥 Download Assessment Results (JSON)", json.dumps(single, indent=2), file_name="risk_assessment_single.json", mime="application/json")
                 else:
-                    article_text = str(news_data)
-            except json.JSONDecodeError:
-                st.error("❌ Invalid JSON file format")
+                    # Build a DataFrame for batch results
+                    df_batch = pd.DataFrame([{k: v for k, v in r.items() if k not in ("raw_results", "theme_scores")} for r in batch_results])
+                    st.markdown("---")
+                    st.markdown(f"### 📊 Batch Results — {len(batch_results)} articles analyzed")
+                    try:
+                        from st_aggrid import AgGrid
+                        from st_aggrid.grid_options_builder import GridOptionsBuilder
+                        gb = GridOptionsBuilder.from_dataframe(df_batch)
+                        gb.configure_default_column(filter=True, sortable=True, resizable=True)
+                        AgGrid(df_batch, fit_columns_on_grid_load=True, enable_enterprise_modules=False, height=400)
+                    except Exception:
+                        st.dataframe(df_batch, use_container_width=True)
 
-    if article_text and st.button("🔍 Analyze Article for Risk", type="primary", key="analyze_news"):
-        if not article_text.strip():
-            st.error("❌ Please provide article text to analyze")
-        else:
-            try:
-                with st.spinner("🤖 AI is analyzing the article..."):
-                    # Score the article
-                    result = score_article(article_text)
+                    # Provide downloads
+                    st.download_button("📥 Download Batch Results (JSON)", json.dumps(batch_results, indent=2), file_name="risk_assessment_batch.json", mime="application/json")
+                    st.download_button("📥 Download Batch Results (CSV)", df_batch.to_csv(index=False), file_name="risk_assessment_batch.csv", mime="text/csv")
 
-                # Display main risk score prominently
-                st.markdown("---")
-                st.markdown("### 📊 Risk Assessment Results")
-
-                # Determine risk level
-                risk_score = result.overall_news_risk_score
-                if risk_score <= 30:
-                    risk_level = "LOW"
-                elif risk_score <= 50:
-                    risk_level = "MODERATE"
-                elif risk_score <= 80:
-                    risk_level = "HIGH"
-                else:
-                    risk_level = "SEVERE"
-
-                rec = RISK_RECOMMENDATIONS[risk_level]
-
-                # Main metric display
-                col1, col2 = st.columns([2, 3])
-                with col1:
-                    st.metric(
-                        "Overall Risk Score",
-                        f"{risk_score:.1f}/100",
-                        delta=None,
-                        label_visibility="visible"
-                    )
-                with col2:
-                    st.markdown(f"### {rec['emoji']} {rec['description']}")
-
-                # Risk meter/gauge
-                fig = go.Figure(go.Indicator(
-                    mode="gauge+number+delta",
-                    value=risk_score,
-                    domain={'x': [0, 1], 'y': [0, 1]},
-                    title={'text': "Risk Level"},
-                    delta={'reference': 50},
-                    gauge={
-                        'axis': {'range': [None, 100]},
-                        'bar': {'color': rec['color']},
-                        'steps': [
-                            {'range': [0, 30], 'color': "#d4edda"},
-                            {'range': [30, 50], 'color': "#fff3cd"},
-                            {'range': [50, 80], 'color': "#ffe5e5"},
-                            {'range': [80, 100], 'color': "#f8d7da"}
-                        ],
-                        'threshold': {
-                            'line': {'color': "red", 'width': 4},
-                            'thickness': 0.75,
-                            'value': 80}
-                    }
-                ))
-                st.plotly_chart(fig, use_container_width=True)
-
-                # Recommendation section
-                st.markdown("---")
-                st.markdown("### 📋 Recommendation")
-                st.markdown(rec["recommendation"])
-                
-                st.markdown("#### Recommended Actions:")
-                for action in rec["actions"]:
-                    st.markdown(action)
-
-                # Detailed scoring breakdown
-                st.markdown("---")
-                st.markdown("### 🔍 Detailed Analysis")
-
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    sentiment = result.sentiment_score
-                    st.metric(
-                        "Sentiment Score",
-                        f"{sentiment:.3f}",
-                        help="Range: -1 (very negative) to +1 (very positive). Negative sentiment = higher risk."
-                    )
-                with col2:
-                    keyword_intensity = result.keyword_intensity_score
-                    st.metric(
-                        "Keyword Intensity",
-                        f"{keyword_intensity:.3f}",
-                        help="Frequency of risk keywords relative to article length. Higher = more risk signals."
-                    )
-                with col3:
-                    disruption_sim = result.disruption_similarity_score
-                    st.metric(
-                        "Disruption Similarity",
-                        f"{disruption_sim:.3f}",
-                        help="How similar the article is to past supply chain crises. Higher = more concerning."
-                    )
-                with col4:
-                    st.write("")  # spacer
-
-                # Theme breakdown
-                st.markdown("#### Risk Themes Detected:")
-                themes = result.theme_scores
-                theme_data = []
-                for theme, score in themes.items():
-                    theme_name = theme.replace("_", " ").title()
-                    theme_data.append({"Theme": theme_name, "Score": score})
-
-                theme_df = pd.DataFrame(theme_data)
-                theme_df = theme_df.sort_values("Score", ascending=False).reset_index(drop=True)
-
-                # Create a bar chart
-                fig_themes = go.Figure(
-                    go.Bar(
-                        x=theme_df["Theme"],
-                        y=theme_df["Score"],
-                        marker_color=['#dc3545' if s > 0.05 else '#ffc107' if s > 0.02 else '#28a745' for s in theme_df["Score"]]
-                    )
-                )
-                fig_themes.update_layout(
-                    title="Risk Theme Intensity",
-                    xaxis_title="Theme",
-                    yaxis_title="Score",
-                    height=400,
-                    showlegend=False
-                )
-                st.plotly_chart(fig_themes, use_container_width=True)
-
-                # Display as table
-                st.dataframe(
-                    theme_df.style.bar(subset=["Score"], color="#fd7e14"),
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-                # Raw JSON output for technical review
-                st.markdown("---")
-                st.markdown("### 📄 Raw JSON Output")
-                with st.expander("Click to expand raw results"):
-                    st.json(result.to_dict())
-
-                # Download results
-                results_json = json.dumps({
-                    "overall_risk_score": risk_score,
-                    "risk_level": risk_level,
-                    "recommendation": rec["recommendation"],
-                    "detailed_results": result.to_dict()
-                }, indent=2)
-                st.download_button(
-                    "📥 Download Assessment Results (JSON)",
-                    results_json,
-                    file_name="risk_assessment_results.json",
-                    mime="application/json"
-                )
-
-            except Exception as e:
-                st.error(f"❌ Error analyzing article: {str(e)}")
-                with st.expander("Technical Details"):
-                    st.write(str(e))
+        except Exception as e:
+            st.error(f"❌ Error analyzing article(s): {str(e)}")
+            with st.expander("Technical Details"):
+                st.write(str(e))
