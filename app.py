@@ -18,6 +18,12 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     PyPDF2 = None
 
+# Initialize session state for data refresh tracking
+if 'last_update' not in st.session_state:
+    st.session_state.last_update = None
+if 'data_refresh_trigger' not in st.session_state:
+    st.session_state.data_refresh_trigger = 0
+
 
 st.set_page_config(
     page_title="Supply Risk Scoring Intake",
@@ -225,6 +231,11 @@ The system will score them based on food safety, regulatory, operational, and fi
                         print(f"Error saving supplier {supplier.get('name')}: {str(e)}")
                 
                 st.success(f"✅ JSON submitted and scored successfully. **{saved_count} suppliers saved to database.**")
+                
+                # Update session state to trigger combined insights refresh
+                import datetime
+                st.session_state.last_update = datetime.datetime.now()
+                st.session_state.data_refresh_trigger += 1
 
                 # Build a DataFrame and expand subscores into columns
                 rows = []
@@ -527,78 +538,81 @@ and financial distress, providing actionable risk scores and recommendations.
         if txt and txt.strip():
             articles_list = [{"id": 0, "text": txt.strip()}]
     else:
-        uploaded_news_file = st.file_uploader("Upload a file with news articles (JSON, TXT, or PDF)", type=["json", "txt", "pdf"], key="news_json")
-        if uploaded_news_file is not None:
-            try:
-                name = uploaded_news_file.name or "uploaded"
-                content_bytes = uploaded_news_file.read()
-                # handle PDF files explicitly
-                processed = False
-                if name.lower().endswith(".pdf"):
-                    if PyPDF2 is None:
-                        st.error("PDF support requires PyPDF2. Install it with `pip install PyPDF2`.")
-                        processed = True
-                    else:
+        uploaded_news_files = st.file_uploader("Upload file(s) with news articles (JSON, TXT, or PDF)", type=["json", "txt", "pdf"], accept_multiple_files=True, key="news_json")
+        if uploaded_news_files:
+            for uploaded_news_file in uploaded_news_files:
+                try:
+                    name = uploaded_news_file.name or "uploaded"
+                    content_bytes = uploaded_news_file.read()
+                    # handle PDF files explicitly
+                    processed = False
+                    if name.lower().endswith(".pdf"):
+                        if PyPDF2 is None:
+                            st.error("PDF support requires PyPDF2. Install it with `pip install PyPDF2`.")
+                            processed = True
+                        else:
+                            try:
+                                reader = PyPDF2.PdfReader(io.BytesIO(content_bytes))
+                                pages = []
+                                for p in reader.pages:
+                                    page_text = p.extract_text() or ""
+                                    pages.append(page_text)
+                                text = "\n".join(pages)
+                                paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+                                for i, p in enumerate(paragraphs):
+                                    articles_list.append({"id": len(articles_list), "text": p, "filename": name})
+                                processed = True
+                            except Exception:
+                                st.error(f"Failed to parse PDF content for {name}.")
+                                processed = True
+
+                    # try JSON first (unless PDF already processed)
+                    if not processed:
                         try:
-                            reader = PyPDF2.PdfReader(io.BytesIO(content_bytes))
-                            pages = []
-                            for p in reader.pages:
-                                page_text = p.extract_text() or ""
-                                pages.append(page_text)
-                            text = "\n".join(pages)
+                            news_data = json.loads(content_bytes.decode("utf-8"))
+                        except Exception:
+                            # treat as plain text file; split into paragraphs by blank lines
+                            try:
+                                text = content_bytes.decode("utf-8")
+                            except Exception:
+                                text = content_bytes.decode("latin-1")
                             paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
                             for i, p in enumerate(paragraphs):
-                                articles_list.append({"id": i, "text": p})
-                            processed = True
-                        except Exception:
-                            st.error("Failed to parse PDF content.")
-                            processed = True
-
-                # try JSON first (unless PDF already processed)
-                if not processed:
-                    try:
-                        news_data = json.loads(content_bytes.decode("utf-8"))
-                    except Exception:
-                        # treat as plain text file; split into paragraphs by blank lines
-                        try:
-                            text = content_bytes.decode("utf-8")
-                        except Exception:
-                            text = content_bytes.decode("latin-1")
-                        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
-                        for i, p in enumerate(paragraphs):
-                            articles_list.append({"id": i, "text": p})
-                    else:
-                        # normalize to list of article texts
-                        if isinstance(news_data, dict):
-                            if "articles" in news_data and isinstance(news_data["articles"], list):
-                                for i, a in enumerate(news_data["articles"]):
-                                    if isinstance(a, dict):
-                                        text = a.get("text", a.get("content", json.dumps(a)))
-                                    else:
-                                        text = str(a)
-                                    if text and str(text).strip():
-                                        articles_list.append({"id": i, "text": str(text).strip()})
-                            elif "text" in news_data:
-                                text = news_data["text"]
-                                articles_list.append({"id": 0, "text": str(text).strip()})
-                            elif "content" in news_data:
-                                text = news_data["content"]
-                                articles_list.append({"id": 0, "text": str(text).strip()})
-                            else:
-                                # fallback: stringify and treat as single article
-                                articles_list.append({"id": 0, "text": json.dumps(news_data)})
-                        elif isinstance(news_data, list):
-                            for i, item in enumerate(news_data):
-                                if isinstance(item, dict):
-                                    text = item.get("text", item.get("content", json.dumps(item)))
-                                else:
-                                    text = str(item)
-                                if text and str(text).strip():
-                                    articles_list.append({"id": i, "text": str(text).strip()})
+                                articles_list.append({"id": len(articles_list), "text": p, "filename": name})
                         else:
-                            articles_list.append({"id": 0, "text": str(news_data)})
-            except Exception:
-                st.error("❌ Invalid or unreadable file format")
+                            # normalize to list of article texts
+                            if isinstance(news_data, dict):
+                                if "articles" in news_data and isinstance(news_data["articles"], list):
+                                    for i, a in enumerate(news_data["articles"]):
+                                        if isinstance(a, dict):
+                                            text = a.get("text", a.get("content", json.dumps(a)))
+                                        else:
+                                            text = str(a)
+                                        if text and str(text).strip():
+                                            articles_list.append({"id": len(articles_list), "text": str(text).strip(), "filename": name})
+                                elif "text" in news_data:
+                                    text = news_data["text"]
+                                    articles_list.append({"id": len(articles_list), "text": str(text).strip(), "filename": name})
+                                elif "content" in news_data:
+                                    text = news_data["content"]
+                                    articles_list.append({"id": len(articles_list), "text": str(text).strip(), "filename": name})
+                                else:
+                                    # fallback: stringify and treat as single article
+                                    articles_list.append({"id": len(articles_list), "text": json.dumps(news_data), "filename": name})
+                            elif isinstance(news_data, list):
+                                for i, item in enumerate(news_data):
+                                    if isinstance(item, dict):
+                                        text = item.get("text", item.get("content", json.dumps(item)))
+                                    else:
+                                        text = str(item)
+                                    if text and str(text).strip():
+                                        articles_list.append({"id": len(articles_list), "text": str(text).strip(), "filename": name})
+                            else:
+                                articles_list.append({"id": len(articles_list), "text": str(news_data), "filename": name})
+                except Exception:
+                    st.error(f"❌ Invalid or unreadable file format for {uploaded_news_file.name}")
+            if articles_list:
+                st.success(f"Loaded {len(articles_list)} article(s) from {len(uploaded_news_files)} file(s).")
 
     if articles_list and st.button("🔍 Analyze Article(s) for Risk", type="primary", key="analyze_news"):
         try:
@@ -638,6 +652,7 @@ and financial distress, providing actionable risk scores and recommendations.
                         "theme_scores": res.theme_scores,
                         "raw_results": res.to_dict(),
                         "article_text": text,  # Store original text for database
+                        "filename": entry.get("filename", "pasted_text.txt"),
                     })
 
                 # ===================================================================
@@ -647,14 +662,44 @@ and financial distress, providing actionable risk scores and recommendations.
                 for i, result in enumerate(batch_results):
                     try:
                         # Generate filename if not from file upload
-                        filename = f"news_article_{i+1}.txt" if input_method == "📄 Paste News Article" else uploaded_news_file.name
+                        filename = result.get("filename", f"news_article_{i+1}.txt") if input_method == "📄 Paste News Article" else result.get("filename", f"news_article_{i+1}.txt")
                         
                         # determine supplier name(s) referenced in article text
                         supplier_match = None
+                        def normalize_text(text):
+                            """Normalize text for better matching by removing punctuation and extra spaces."""
+                            import re
+                            # Remove apostrophes (both straight and curly), quotes, and other punctuation
+                            text = re.sub(r"[\'\u2019\"]", "", text)
+                            # Remove extra spaces
+                            text = re.sub(r"\s+", " ", text).strip()
+                            return text.lower()
+                        
+                        article_text_normalized = normalize_text(result["article_text"])
                         for name in supplier_names:
-                            if name and name.lower() in result["article_text"].lower():
-                                supplier_match = name
-                                break
+                            if name:
+                                name_normalized = normalize_text(name)
+                                # Check if normalized supplier name is in normalized article text
+                                if name_normalized in article_text_normalized:
+                                    supplier_match = name
+                                    break
+                                # Also try partial matches (e.g., "diana bakery" should match "diana's bakery")
+                                name_parts = name_normalized.split()
+                                if len(name_parts) > 1:
+                                    # Check if major parts of the name are present
+                                    major_parts = [part for part in name_parts if len(part) > 2]  # Skip short words
+                                    if all(part in article_text_normalized for part in major_parts[:2]):  # Match first 2 major parts
+                                        supplier_match = name
+                                        break
+                        # no match found in paragraph text? try filename fallback
+                        if supplier_match is None:
+                            fname_norm = normalize_text(filename or "")
+                            for name in supplier_names:
+                                if name:
+                                    name_norm = normalize_text(name)
+                                    if name_norm in fname_norm:
+                                        supplier_match = name
+                                        break
                         
                         # Save article to database with optional supplier linkage
                         article_id = news_db.save_article(filename, result["article_text"], supplier_name=supplier_match)
@@ -677,6 +722,10 @@ and financial distress, providing actionable risk scores and recommendations.
                 
                 if saved_count > 0:
                     st.success(f"✅ Analysis complete. **{saved_count} article(s) saved to database.**")
+                    # Update session state to trigger combined insights refresh
+                    import datetime
+                    st.session_state.last_update = datetime.datetime.now()
+                    st.session_state.data_refresh_trigger += 1
 
                 # If multiple articles, show a batch table; if only one, show detailed view
                 if len(batch_results) == 0:
@@ -744,275 +793,34 @@ and financial distress, providing actionable risk scores and recommendations.
 # ============================================================================
 st.markdown("---")
 
-db_tabs = st.tabs(["📚 Supplier Database", "📰 News Articles Database", "🧩 Combined Insights"])
+db_tabs = st.tabs(["🧩 Combined Insights"])
 
 with db_tabs[0]:
-    st.markdown("### 📚 Saved Suppliers Database")
-    
-    db = SupplierDatabase()
-    db_stats = db.get_summary_stats()
-    
-    # Display database statistics
-    col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
-    col1.metric("📦 Total Suppliers", db_stats["total_suppliers"])
-    risk_dist = db_stats["risk_distribution"]
-    col2.metric("🟢 Low Risk", risk_dist.get("LOW", 0))
-    col3.metric("🟡 Moderate", risk_dist.get("MODERATE", 0))
-    col4.metric("🔴 High Risk", risk_dist.get("HIGH", 0))
-    col5.metric("⚫ Severe", risk_dist.get("SEVERE", 0))
-    
-    col1, col2 = st.columns([2, 1])
-    col1.metric("📊 Average Risk Score", db_stats["average_risk_score"])
-    
-    # Database management for suppliers
-    db_action = st.radio("Database Action:", ["📋 View Suppliers", "🗑️ Remove Suppliers"], horizontal=True, key="supplier_db_action")
-    
-    if db_action == "📋 View Suppliers":
-        if st.checkbox("View all saved suppliers from database", key="view_supplier_checkbox"):
-            all_suppliers = db.get_all_suppliers()
-            if all_suppliers:
-                db_df = pd.DataFrame([{
-                    "ID": s["id"],
-                    "Name": s["name"],
-                    "Risk Level": s["risk_level"],
-                    "Risk Score": s["risk_score"],
-                    "Updated": s["updated_at"],
-                } for s in all_suppliers])
-                st.dataframe(db_df, use_container_width=True)
-                
-                # Option to export database
-                csv_export = db_df.to_csv(index=False)
-                st.download_button(
-                    "📥 Download database (CSV)",
-                    csv_export,
-                    file_name="supplier_database.csv",
-                    mime="text/csv"
-                )
-            else:
-                st.info("No suppliers saved in database yet.")
-    
-    elif db_action == "🗑️ Remove Suppliers":
-        all_suppliers = db.get_all_suppliers()
-        if all_suppliers:
-            st.warning("⚠️ **Deleting suppliers will permanently remove them from the database.**")
-            
-            supplier_names = [s["name"] for s in all_suppliers]
-            
-            st.markdown("#### Remove a Single Supplier")
-            selected_supplier_name = st.selectbox(
-                "Select supplier to remove:",
-                supplier_names,
-                key="delete_single_supplier_db"
-            )
-            
-            if selected_supplier_name:
-                selected_supplier_id = next((s["id"] for s in all_suppliers if s["name"] == selected_supplier_name), None)
-                if selected_supplier_id:
-                    col1, col2, col3 = st.columns([2, 1, 1])
-                    with col1:
-                        st.info(f"Selected: **{selected_supplier_name}**")
-                    with col3:
-                        if st.button("🗑️ Delete", key="delete_single_supplier_btn_db", type="secondary"):
-                            if st.checkbox("I confirm deletion of this supplier", key="confirm_delete_single_supplier_db"):
-                                db.delete_supplier(selected_supplier_id)
-                                st.success(f"✅ Supplier **{selected_supplier_name}** has been permanently deleted from the database.")
-                                st.rerun()
-            
-            st.markdown("---")
-            st.markdown("#### Remove Multiple Suppliers")
-            
-            selected_suppliers = st.multiselect(
-                "Select suppliers to remove (you can select multiple):",
-                supplier_names,
-                key="delete_multiple_suppliers_db"
-            )
-            
-            if selected_suppliers:
-                st.info(f"Selected {len(selected_suppliers)} supplier(s) for deletion")
-                
-                if st.checkbox("I confirm deletion of all selected suppliers", key="confirm_delete_multiple_suppliers_db"):
-                    if st.button("🗑️ Delete All Selected", key="delete_multiple_suppliers_btn_db", type="secondary"):
-                        supplier_ids = [s["id"] for s in all_suppliers if s["name"] in selected_suppliers]
-                        deleted_count = 0
-                        for supplier_id in supplier_ids:
-                            db.delete_supplier(supplier_id)
-                            deleted_count += 1
-                        
-                        st.success(f"✅ Successfully deleted **{deleted_count}** supplier(s) from the database.")
-                        st.rerun()
-        else:
-            st.info("No suppliers in database to remove.")
-
-with db_tabs[1]:
-    st.markdown("### 📰 Saved News Articles Database")
-    
-    news_db = NewsDatabase()
-    news_stats = news_db.get_summary_stats()
-    
-    # Display database statistics
-    col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
-    col1.metric("📄 Total Articles", news_stats["total_articles"])
-    risk_dist = news_stats["risk_distribution"]
-    col2.metric("🟢 Low Risk", risk_dist.get("LOW", 0))
-    col3.metric("🟡 Moderate", risk_dist.get("MODERATE", 0))
-    col4.metric("🔴 High Risk", risk_dist.get("HIGH", 0))
-    col5.metric("⚫ Severe", risk_dist.get("SEVERE", 0))
-    
-    col1, col2 = st.columns([2, 1])
-    col1.metric("📊 Average Risk Score", news_stats["average_risk_score"])
-    col2.metric("💭 Avg Sentiment", news_stats["average_sentiment_score"])
-    
-    # News database management
-    news_action = st.radio("News Article Action:", ["📋 View Articles", "🔍 Search", "🗑️ Remove Articles"], horizontal=True, key="news_db_action")
-    
-    if news_action == "📋 View Articles":
-        if st.checkbox("View all saved news articles from database", key="view_news_checkbox_db"):
-            all_articles = news_db.get_all_articles()
-            if all_articles:
-                article_data = []
-                for article in all_articles:
-                    scores = news_db.get_scoring_results_for_article(article["id"])
-                    latest_score = scores[0] if scores else None
-                    
-                    article_data.append({
-                        "ID": article["id"],
-                        "Filename": article["filename"],
-                        "Length": article["content_length"],
-                        "Risk Score": latest_score["overall_risk_score"] if latest_score else "N/A",
-                        "Risk Level": latest_score["risk_level"] if latest_score else "N/A",
-                        "Uploaded": article["uploaded_at"],
-                    })
-                
-                news_df = pd.DataFrame(article_data)
-                st.dataframe(news_df, use_container_width=True)
-                
-                st.subheader("View Article Details")
-                selected_id = st.selectbox(
-                    "Select an article to view details:",
-                    [a["id"] for a in all_articles],
-                    format_func=lambda x: next((a["filename"] for a in all_articles if a["id"] == x), f"Article {x}"),
-                    key="select_news_detail_db"
-                )
-                
-                if selected_id:
-                    article = news_db.get_article(selected_id)
-                    scores = news_db.get_scoring_results_for_article(selected_id)
-                    
-                    st.markdown(f"**Filename:** {article['filename']}")
-                    st.markdown(f"**Uploaded:** {article['uploaded_at']}")
-                    st.markdown(f"**Content Length:** {article['content_length']} characters")
-                    
-                    if scores:
-                        latest = scores[0]
-                        st.markdown("#### Latest Scoring Result")
-                        col1, col2, col3, col4 = st.columns(4)
-                        with col1:
-                            st.metric("Risk Score", f"{latest['overall_risk_score']:.1f}")
-                        with col2:
-                            st.metric("Risk Level", latest['risk_level'])
-                        with col3:
-                            st.metric("Sentiment", f"{latest['sentiment_score']:.3f}")
-                        with col4:
-                            st.metric("Keyword Intensity", f"{latest['keyword_intensity_score']:.3f}")
-                        
-                        if latest['theme_scores']:
-                            theme_scores = json.loads(latest['theme_scores'])
-                            theme_df = pd.DataFrame([{"Theme": k.replace("_", " ").title(), "Score": v} for k, v in theme_scores.items()])
-                            theme_df = theme_df.sort_values("Score", ascending=False).reset_index(drop=True)
-                            st.plotly_chart(go.Figure(go.Bar(x=theme_df['Theme'], y=theme_df['Score'])), use_container_width=True)
-                    
-                    with st.expander("📄 Article Preview"):
-                        st.text(article['content'][:500] + "..." if len(article['content']) > 500 else article['content'])
-                
-                csv_export = news_df.to_csv(index=False)
-                st.download_button(
-                    "📥 Download articles list (CSV)",
-                    csv_export,
-                    file_name="news_articles_database.csv",
-                    mime="text/csv"
-                )
-            else:
-                st.info("No news articles saved in database yet.")
-    
-    elif news_action == "🔍 Search":
-        search_keyword = st.text_input("Search articles by keyword:", placeholder="Enter keyword to search...", key="news_search_db")
-        if search_keyword:
-            results = news_db.search_articles(search_keyword)
-            if results:
-                st.success(f"Found {len(results)} article(s) matching '{search_keyword}'")
-                search_data = []
-                for article in results:
-                    scores = news_db.get_scoring_results_for_article(article["id"])
-                    latest_score = scores[0] if scores else None
-                    
-                    search_data.append({
-                        "ID": article["id"],
-                        "Filename": article["filename"],
-                        "Risk Score": latest_score["overall_risk_score"] if latest_score else "N/A",
-                        "Risk Level": latest_score["risk_level"] if latest_score else "N/A",
-                    })
-                
-                search_df = pd.DataFrame(search_data)
-                st.dataframe(search_df, use_container_width=True)
-            else:
-                st.warning(f"No articles found matching '{search_keyword}'")
-    
-    elif news_action == "🗑️ Remove Articles":
-        all_articles = news_db.get_all_articles()
-        if all_articles:
-            st.warning("⚠️ **Deleting articles will permanently remove them from the database.**")
-            
-            article_names = [a["filename"] for a in all_articles]
-            
-            st.markdown("#### Remove a Single Article")
-            selected_article_name = st.selectbox(
-                "Select article to remove:",
-                article_names,
-                key="delete_single_article_db"
-            )
-            
-            if selected_article_name:
-                selected_article_id = next((a["id"] for a in all_articles if a["filename"] == selected_article_name), None)
-                if selected_article_id:
-                    col1, col2, col3 = st.columns([2, 1, 1])
-                    with col1:
-                        st.info(f"Selected: **{selected_article_name}**")
-                    with col3:
-                        if st.button("🗑️ Delete", key="delete_single_article_btn_db", type="secondary"):
-                            if st.checkbox("I confirm deletion of this article", key="confirm_delete_single_article_db"):
-                                news_db.delete_article(selected_article_id)
-                                st.success(f"✅ Article **{selected_article_name}** has been permanently deleted from the database.")
-                                st.rerun()
-            
-            st.markdown("---")
-            st.markdown("#### Remove Multiple Articles")
-            
-            selected_articles = st.multiselect(
-                "Select articles to remove (you can select multiple):",
-                article_names,
-                key="delete_multiple_articles_db"
-            )
-            
-            if selected_articles:
-                st.info(f"Selected {len(selected_articles)} article(s) for deletion")
-                
-                if st.checkbox("I confirm deletion of all selected articles", key="confirm_delete_multiple_articles_db"):
-                    if st.button("🗑️ Delete All Selected", key="delete_multiple_articles_btn_db", type="secondary"):
-                        article_ids = [a["id"] for a in all_articles if a["filename"] in selected_articles]
-                        deleted_count = news_db.delete_articles_batch(article_ids)
-                        
-                        st.success(f"✅ Successfully deleted **{deleted_count}** article(s) from the database.")
-                        st.rerun()
-        else:
-            st.info("No news articles in database to remove.")
-
-with db_tabs[2]:
     st.markdown("### 🧩 Combined Supplier/News Insights")
-
+    
+    # Add refresh button and last update info
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        if st.session_state.last_update:
+            # Check if update was recent (within last 30 seconds)
+            import datetime
+            time_diff = datetime.datetime.now() - st.session_state.last_update
+            if time_diff.total_seconds() < 30:
+                st.success(f"✅ Data updated: {st.session_state.last_update.strftime('%H:%M:%S')}")
+            else:
+                st.info(f"📅 Last updated: {st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')}")
+        else:
+            st.info("📅 No data updates yet")
+    with col2:
+        if st.button("🔄 Refresh Data", key="refresh_combined_data"):
+            st.session_state.data_refresh_trigger += 1
+            st.rerun()
+    
     # initialize databases
     db = SupplierDatabase()
     news_db = NewsDatabase()
-
+    
+    # Display database statistics
     all_suppliers = db.get_all_suppliers()
     news_stats = news_db.get_supplier_news_stats()
 
