@@ -156,12 +156,168 @@ The model itself (all-MiniLM-L6-v2) is **pre-trained** — it came from a librar
 
 3. **Install dependencies:**
    ```bash
-   pip install textblob numpy sentence-transformers
+   pip install textblob numpy sentence-transformers streamlit pandas plotly PyPDF2 st-aggrid
    ```
+
+   **Note on PyPDF2:** Required for PDF article uploads. Install with `pip install PyPDF2`
+   
+   **Optional:** Install `st-aggrid` for enhanced interactive tables (`pip install st-aggrid`)
 
    That's it! No API keys, no external service subscriptions needed.
 
+## Database Features
+
+### Automatic Supplier Storage
+When you upload a JSON file with supplier data through the Streamlit app, the system automatically:
+- ✅ Scores each supplier based on food safety, regulatory, operational, and financial metrics
+- ✅ Saves suppliers to a local SQLite database (`suppliers.db`)
+- ✅ Stores all scoring results and history
+- ✅ Persists data for historical analysis and trend tracking
+
+### Accessing Saved Suppliers
+In the Streamlit app, after uploading suppliers:
+1. Scores are calculated and displayed immediately
+2. A success message confirms how many suppliers were saved to the database
+3. Scroll down to the **Saved Suppliers Database** section to:
+   - View database statistics (total count, risk distribution, average risk score)
+   - Toggle the "View all saved suppliers from database" checkbox
+   - Export the database to CSV for external analysis
+
+### Database Schema
+The system uses two main tables:
+
+**suppliers table:**
+- `id`: Unique identifier
+- `name`: Supplier name (unique)
+- `data`: Original supplier JSON data
+- `risk_score`: Latest risk score (0-100)
+- `risk_level`: Risk category (LOW, MODERATE, HIGH, SEVERE)
+- `created_at`: First upload timestamp
+- `updated_at`: Last update timestamp
+
+**scoring_history table:**
+- `id`: Unique identifier
+- `supplier_id`: Reference to supplier
+- `risk_score`: Risk score from this evaluation
+- `risk_level`: Risk level from this evaluation
+- `subscores`: Component scores (JSON) - food safety, regulatory, operational, financial
+- `scored_at`: When this score was calculated
+
+### Python API
+You can also use the database directly in your own Python code:
+
+```python
+from database import SupplierDatabase
+
+# Initialize database
+db = SupplierDatabase()
+
+# Save a supplier
+supplier_id = db.save_supplier({
+    "name": "Acme Suppliers",
+    "foodSafetyQuality": {...},
+    ...
+})
+
+# Save scoring result
+db.save_scoring_result(
+    supplier_id=supplier_id,
+    risk_score=35,
+    risk_level="MODERATE",
+    subscores={"foodSafety": 0.45, "regulatory": 0.35, ...}
+)
+
+# Retrieve suppliers
+all_suppliers = db.get_all_suppliers()
+by_risk = db.get_suppliers_by_risk_level("HIGH")
+history = db.get_scoring_history(supplier_id)
+
+# Get statistics
+stats = db.get_summary_stats()
+```
+
+### News Articles Database
+
+When you upload and analyze news articles in Tab 2, the system automatically:
+- ✅ Saves each article to a local SQLite database (`news_articles.db`)
+- ✅ Stores all analysis results including risk scores and sentiment analysis
+- ✅ Maintains scoring history for trend analysis
+- ✅ Allows searching and filtering articles by risk level and keywords
+
+**News Database Schema:**
+
+**news_articles table:**
+- `id`: Unique identifier
+- `filename`: Original filename
+- `content`: Full article text
+- `content_length`: Length of article in characters
+- `uploaded_at`: Upload timestamp
+
+**news_scoring_results table:**
+- `id`: Unique identifier
+- `article_id`: Reference to article
+- `overall_risk_score`: Risk score (0-100)
+- `risk_level`: Risk category (LOW, MODERATE, HIGH, SEVERE)
+- `sentiment_score`: Sentiment analysis score
+- `keyword_intensity_score`: Intensity of risk keywords
+- `disruption_similarity_score`: Similarity to past disruptions
+- `theme_scores`: JSON with scores for each risk theme
+- `full_results`: Complete analysis results as JSON
+- `scored_at`: When this analysis was performed
+
+**News Database Features:**
+- 📋 **View Articles**: Browse all saved articles with statistics
+- 🔍 **Search**: Find articles by filename or content keywords
+- 🗑️ **Remove**: Delete individual or multiple articles
+- 📊 **Analytics**: View risk distribution and average sentiment
+
+**Python API for News Database:**
+
+```python
+from news_database import NewsDatabase
+
+# Initialize database
+db = NewsDatabase()
+
+# Save an article
+article_id = db.save_article("article.txt", "Article content here...")
+
+# Save scoring result
+db.save_scoring_result(
+    article_id=article_id,
+    overall_risk_score=65.5,
+    risk_level="HIGH",
+    sentiment_score=-0.45,
+    keyword_intensity_score=0.75,
+    disruption_similarity_score=0.60,
+    theme_scores={"labor": 0.8, "environmental": 0.6, ...},
+    full_results={...}
+)
+
+# Retrieve articles
+all_articles = db.get_all_articles()
+high_risk_articles = db.get_articles_by_risk_level("HIGH")
+search_results = db.search_articles("environmental")
+
+# Get scoring history
+scores = db.get_scoring_results_for_article(article_id)
+
+# Get statistics
+stats = db.get_summary_stats()
+```
+
 ## Quick Start
+
+### Run the Streamlit App
+
+```bash
+streamlit run app.py
+```
+
+This will open the web app where you can:
+1. **Upload JSON files** with supplier data in Tab 1
+2. **View suppliers** saved to the database with statistics
+3. **Analyze news articles** about suppliers in Tab 2
 
 ### Run the Built-in Demo
 
@@ -170,6 +326,14 @@ python supplier_news_risk.py
 ```
 
 This will score a sample article and print results showing the risk score and breakdown.
+
+### Test the Database
+
+```bash
+python test_database.py
+```
+
+This will verify that the database is working correctly and create a test database file.
 
 ---
 
