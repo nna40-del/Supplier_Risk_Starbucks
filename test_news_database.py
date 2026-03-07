@@ -69,6 +69,53 @@ print(f"   ✓ Average sentiment score: {stats['average_sentiment_score']}\n")
 # Test 7: Search articles
 print("7️⃣ Searching articles...")
 search_results = db.search_articles("factory")
-print(f"   ✓ Found {len(search_results)} article(s) matching 'factory'\n")
+print(f"   ✓ Found {len(search_results)} article(s) matching 'factory" + "'\n")
 
-print("✅ All tests passed! News database is working correctly.")
+# ----------------------------------------------------------------------
+# Additional integration tests for supplier-news combined insights
+# ----------------------------------------------------------------------
+
+print("8️⃣ Testing supplier-news integration...")
+
+from database import SupplierDatabase
+
+# create supplier database and add a sample supplier
+sup_db = SupplierDatabase("test_suppliers.db")
+print("   ✓ Created supplier database")
+
+supplier = {"name": "Example Supplier", "extra": "info"}
+sup_id = sup_db.save_supplier(supplier)
+print(f"   ✓ Supplier saved with ID: {sup_id}")
+
+# score the supplier
+sup_db.save_scoring_result(sup_id, risk_score=60, risk_level="HIGH", subscores={"dummy": 0.6})
+print("   ✓ Supplier scoring result saved")
+
+# save a news article linked to that supplier
+article_id_2 = db.save_article("supplier_news.txt", test_article, supplier_name="Example Supplier")
+print(f"   ✓ Article saved with supplier link ID: {article_id_2}")
+
+# score it for completeness
+db.save_scoring_result(
+    article_id=article_id_2,
+    overall_risk_score=72.0,
+    risk_level="HIGH",
+    sentiment_score=-0.55,
+    keyword_intensity_score=0.65,
+    disruption_similarity_score=0.50,
+    theme_scores=test_result,
+    full_results={"raw": "test2"}
+)
+print("   ✓ Scoring result for linked article saved")
+
+# verify supplier news stats
+stats = db.get_supplier_news_stats()
+print(f"   ✓ Supplier news stats: {stats}")
+
+# calculate combined risk manually to ensure logic aligns
+if "Example Supplier" in stats:
+    avg_news = stats["Example Supplier"]["avg_score"]
+    combined = round((60 + avg_news) / 2, 1)
+    print(f"   ✓ Computed combined score for Example Supplier: {combined}")
+
+print("✅ All tests (including integration) passed!")

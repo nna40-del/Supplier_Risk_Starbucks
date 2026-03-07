@@ -306,6 +306,55 @@ scores = db.get_scoring_results_for_article(article_id)
 stats = db.get_summary_stats()
 ```
 
+### 🔗 Combined Insights
+
+A new **third tab** in the Streamlit app merges supplier records with related news article metrics so you can evaluate
+risk using both structured supplier data and unstructured news content.
+
+When you open the **Combined Insights** tab you will see:
+
+- Supplier risk score & level (from the supplier database)
+- Number of news articles linked to that supplier
+- Average and maximum news-risk scores for those articles
+- A **combined risk score** (simple average of supplier score and avg news score)
+- A derived combined risk level using the same LOW/MODERATE/HIGH/SEVERE thresholds
+- Interactive grouped bar chart comparing supplier vs. news risk
+- A dropdown to drill into the actual articles associated with each supplier
+
+This tab makes it easy to spot suppliers whose inherent profile is concerning **and** are being
+mentioned in risky news items.
+
+You can also access this functionality programmatically:
+
+```python
+from database import SupplierDatabase
+from news_database import NewsDatabase
+
+sup_db = SupplierDatabase()
+news_db = NewsDatabase()
+
+suppliers = sup_db.get_all_suppliers()
+news_stats = news_db.get_supplier_news_stats()  # returns stats keyed by supplier name
+
+# merge data manually if you need custom reports
+combined = []
+for sup in suppliers:
+    name = sup["name"]
+    stats = news_stats.get(name, {})
+    combined_score = None
+    if stats:
+        combined_score = (sup["risk_score"] + stats["avg_score"]) / 2
+    combined.append({
+        "name": name,
+        "supplier_score": sup["risk_score"],
+        "news_avg_score": stats.get("avg_score"),
+        "combined_score": combined_score,
+    })
+```
+
+Use `combined` for further analysis or reporting.
+
+
 ## Quick Start
 
 ### Run the Streamlit App

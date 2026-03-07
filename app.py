@@ -649,8 +649,15 @@ and financial distress, providing actionable risk scores and recommendations.
                         # Generate filename if not from file upload
                         filename = f"news_article_{i+1}.txt" if input_method == "📄 Paste News Article" else uploaded_news_file.name
                         
-                        # Save article to database
-                        article_id = news_db.save_article(filename, result["article_text"])
+                        # determine supplier name(s) referenced in article text
+                        supplier_match = None
+                        for name in supplier_names:
+                            if name and name.lower() in result["article_text"].lower():
+                                supplier_match = name
+                                break
+                        
+                        # Save article to database with optional supplier linkage
+                        article_id = news_db.save_article(filename, result["article_text"], supplier_name=supplier_match)
                         
                         # Save scoring result
                         if article_id:
@@ -737,7 +744,7 @@ and financial distress, providing actionable risk scores and recommendations.
 # ============================================================================
 st.markdown("---")
 
-db_tabs = st.tabs(["📚 Supplier Database", "📰 News Articles Database"])
+db_tabs = st.tabs(["📚 Supplier Database", "📰 News Articles Database", "🧩 Combined Insights"])
 
 with db_tabs[0]:
     st.markdown("### 📚 Saved Suppliers Database")
@@ -998,3 +1005,100 @@ with db_tabs[1]:
                         st.rerun()
         else:
             st.info("No news articles in database to remove.")
+
+with db_tabs[2]:
+    st.markdown("### 🧩 Combined Supplier/News Insights")
+
+    # initialize databases
+    db = SupplierDatabase()
+    news_db = NewsDatabase()
+
+    all_suppliers = db.get_all_suppliers()
+    news_stats = news_db.get_supplier_news_stats()
+
+    # build combined summary records
+    combined_data = []
+    for s in all_suppliers:
+        name = s.get("name")
+        count = news_stats.get(name, {}).get("count", 0)
+        avg_news = news_stats.get(name, {}).get("avg_score", 0)
+        max_news = news_stats.get(name, {}).get("max_score", 0)
+        combined_score = None
+        combined_level = None
+        if count > 0:
+            # scale both scores 0-100 and average them
+            combined_score = round((s.get("risk_score", 0) + avg_news) / 2, 1)
+            if combined_score <= low_cut:
+                combined_level = "LOW"
+            elif combined_score <= moderate_cut:
+                combined_level = "MODERATE"
+            elif combined_score <= high_cut:
+                combined_level = "HIGH"
+            else:
+                combined_level = "SEVERE"
+
+        combined_data.append({
+            "Name": name,
+            "Supplier Risk Score": s.get("risk_score"),
+            "Supplier Risk Level": s.get("risk_level"),
+            "Articles": count,
+            "Avg News Risk": round(avg_news, 1),
+            "Max News Risk": round(max_news, 1),
+            "Combined Score": combined_score if combined_score is not None else "N/A",
+            "Combined Level": combined_level if combined_level is not None else "N/A",
+        })
+
+    if combined_data:
+        combined_df = pd.DataFrame(combined_data)
+
+        # summary metrics
+        total_with_news = int((combined_df["Articles"] > 0).sum())
+        avg_combined = None
+        if total_with_news > 0:
+            avg_combined = combined_df.loc[combined_df["Articles"] > 0, "Combined Score"].astype(float).mean()
+        col1, col2 = st.columns(2)
+        col1.metric("🔗 Suppliers w/ News", total_with_news)
+        if avg_combined is not None:
+            col2.metric("📉 Avg Combined Score", f"{avg_combined:.1f}")
+        else:
+            col2.metric("📉 Avg Combined Score", "N/A")
+
+        st.dataframe(combined_df, use_container_width=True)
+
+        # chart supplier risk vs news risk
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            name="Supplier Risk",
+            x=combined_df["Name"],
+            y=combined_df["Supplier Risk Score"],
+        ))
+        fig.add_trace(go.Bar(
+            name="Avg News Risk",
+            x=combined_df["Name"],
+            y=combined_df["Avg News Risk"],
+        ))
+        fig.update_layout(barmode="group", xaxis_tickangle=-45)
+        st.plotly_chart(fig, use_container_width=True)
+
+        # allow inspection of individual supplier's articles
+        if total_with_news > 0:
+            st.subheader("🔍 Drill into supplier details")
+            selected_supplier = st.selectbox(
+                "Choose a supplier to view linked news articles:",
+                combined_df["Name"],
+                key="combined_supplier_select"
+            )
+            if selected_supplier:
+                articles = news_db.get_articles_by_supplier(selected_supplier)
+                if articles:
+                    art_df = pd.DataFrame(articles)
+                    st.write(f"Articles associated with **{selected_supplier}**")
+                    # show minimal details
+                    st.dataframe(
+                        art_df[["id", "filename", "content_length"]],
+                        use_container_width=True,
+                    )
+                else:
+                    st.info("No news articles associated with this supplier.")
+    else:
+        st.info("No suppliers saved in database yet.")
