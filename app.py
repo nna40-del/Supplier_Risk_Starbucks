@@ -847,6 +847,11 @@ with db_tabs[0]:
 
         combined_data.append({
             "Name": name,
+            "Risk Probability": s.get("risk_probability"),
+            "Food Safety": s.get("foodSafety"),
+            "Regulatory": s.get("regulatory"),
+            "Operational": s.get("operational"),
+            "Financial": s.get("financial"),
             "Supplier Risk Score": s.get("risk_score"),
             "Supplier Risk Level": s.get("risk_level"),
             "Articles": count,
@@ -873,10 +878,35 @@ with db_tabs[0]:
 
         st.dataframe(combined_df, use_container_width=True)
 
-        # chart supplier risk vs news risk
+        # chart supplier risk vs news risk with component breakdown
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            name="Supplier Risk",
+            name="Risk Probability",
+            x=combined_df["Name"],
+            y=combined_df["Risk Probability"],
+        ))
+        fig.add_trace(go.Bar(
+            name="Food Safety",
+            x=combined_df["Name"],
+            y=combined_df["Food Safety"],
+        ))
+        fig.add_trace(go.Bar(
+            name="Regulatory",
+            x=combined_df["Name"],
+            y=combined_df["Regulatory"],
+        ))
+        fig.add_trace(go.Bar(
+            name="Operational",
+            x=combined_df["Name"],
+            y=combined_df["Operational"],
+        ))
+        fig.add_trace(go.Bar(
+            name="Financial",
+            x=combined_df["Name"],
+            y=combined_df["Financial"],
+        ))
+        fig.add_trace(go.Bar(
+            name="Supplier Risk Score",
             x=combined_df["Name"],
             y=combined_df["Supplier Risk Score"],
         ))
@@ -885,7 +915,7 @@ with db_tabs[0]:
             x=combined_df["Name"],
             y=combined_df["Avg News Risk"],
         ))
-        fig.update_layout(barmode="group", xaxis_tickangle=-45)
+        fig.update_layout(barmode="group", xaxis_tickangle=-45, height=500)
         st.plotly_chart(fig, use_container_width=True)
 
         # allow inspection of individual supplier's articles
