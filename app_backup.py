@@ -36,7 +36,16 @@ moderate_cut = 50
 high_cut = 80
 
 # Default column ordering
-default_cols = ["name", "risk_level", "risk_score", "risk_probability", "foodSafety", "regulatory", "operational", "financial"]
+default_cols = [
+    "name",
+    "risk_level",
+    "risk_score",
+    "risk_probability",
+    "foodSafety",
+    "regulatory",
+    "operational",
+    "financial",
+]
 col_order = default_cols
 
 uploaded_file = st.file_uploader("Select a JSON file", type=["json"])
@@ -71,18 +80,32 @@ if uploaded_file is not None:
                     score += 0.25
                 if any(x in combined for x in ("sqf", "brcgs", "fssc", "gfs")):
                     score -= 0.2
-                if "no critical" in combined or "no major" in combined or "no enforcement" in combined:
+                if (
+                    "no critical" in combined
+                    or "no major" in combined
+                    or "no enforcement" in combined
+                ):
                     score -= 0.15
                 return min(max(score, 0.0), 1.0)
 
             def score_regulatory(rc: Dict[str, Any]) -> float:
                 score = 0.5
                 combined = " ".join([str(v).lower() for v in rc.values()])
-                if any(x in combined for x in ("483", "open483", "observation", "observation", "warning")):
+                if any(
+                    x in combined
+                    for x in ("483", "open483", "observation", "observation", "warning")
+                ):
                     score += 0.35
-                if any(x in combined for x in ("no 483", "no 483s", "no enforcement", "clean")):
+                if any(
+                    x in combined
+                    for x in ("no 483", "no 483s", "no enforcement", "clean")
+                ):
                     score -= 0.2
-                if "compliant" in combined or "verified" in combined or "signed" in combined:
+                if (
+                    "compliant" in combined
+                    or "verified" in combined
+                    or "signed" in combined
+                ):
                     score -= 0.15
                 return min(max(score, 0.0), 1.0)
 
@@ -100,22 +123,50 @@ if uploaded_file is not None:
                 lead = str(op.get("leadTime", "")).lower()
                 if any(x in lead for x in ("10", "12", "14", "15", "long")):
                     score += 0.15
-                if any(x in combined for x in ("backup", "redundancy", "identified", "multi-site", "multi")):
+                if any(
+                    x in combined
+                    for x in (
+                        "backup",
+                        "redundancy",
+                        "identified",
+                        "multi-site",
+                        "multi",
+                    )
+                ):
                     score -= 0.15
                 return min(max(score, 0.0), 1.0)
 
             def score_financial(fs_fin: Dict[str, Any]) -> float:
                 score = 0.5
                 combined = " ".join([str(v).lower() for v in fs_fin.values()])
-                if any(x in combined for x in ("low", "stable", "satisfactory", "strong", "audited")):
+                if any(
+                    x in combined
+                    for x in ("low", "stable", "satisfactory", "strong", "audited")
+                ):
                     score -= 0.2
-                if any(x in combined for x in ("moderate", "moderately", "concentration", "seasonal", "private")):
+                if any(
+                    x in combined
+                    for x in (
+                        "moderate",
+                        "moderately",
+                        "concentration",
+                        "seasonal",
+                        "private",
+                    )
+                ):
                     score += 0.05
-                if any(x in combined for x in ("credit risk", "creditreview", "credit")) and "moderate" in combined:
+                if (
+                    any(
+                        x in combined for x in ("credit risk", "creditreview", "credit")
+                    )
+                    and "moderate" in combined
+                ):
                     score += 0.15
                 return min(max(score, 0.0), 1.0)
 
-            def compute_supplier_risks(payload: Dict[str, Any], weights: Dict[str, float]) -> List[Dict[str, Any]]:
+            def compute_supplier_risks(
+                payload: Dict[str, Any], weights: Dict[str, float]
+            ) -> List[Dict[str, Any]]:
                 suppliers = payload.get("suppliers") or []
                 results = []
                 for s in suppliers:
@@ -125,7 +176,12 @@ if uploaded_file is not None:
                     fin = s.get("financialStability", {})
 
                     # use weights passed from UI (normalized)
-                    total = weights.get("fs", 0) + weights.get("rc", 0) + weights.get("op", 0) + weights.get("fin", 0)
+                    total = (
+                        weights.get("fs", 0)
+                        + weights.get("rc", 0)
+                        + weights.get("op", 0)
+                        + weights.get("fin", 0)
+                    )
                     if total <= 0:
                         w_fs = 0.35
                         w_rc = 0.25
@@ -142,7 +198,9 @@ if uploaded_file is not None:
                     v_op = score_operational(op)
                     v_fin = score_financial(fin)
 
-                    risk_probability = v_fs * w_fs + v_rc * w_rc + v_op * w_op + v_fin * w_fin
+                    risk_probability = (
+                        v_fs * w_fs + v_rc * w_rc + v_op * w_op + v_fin * w_fin
+                    )
                     risk_probability = min(max(risk_probability, 0.0), 1.0)
                     risk_score = int(round(risk_probability * 100))
                     # assign one of four risk levels based on configured thresholds
@@ -190,12 +248,14 @@ if uploaded_file is not None:
                     "risk_probability": r.get("risk_probability"),
                 }
                 subs = r.get("_subscores", {})
-                row.update({
-                    "foodSafety": subs.get("foodSafety"),
-                    "regulatory": subs.get("regulatory"),
-                    "operational": subs.get("operational"),
-                    "financial": subs.get("financial"),
-                })
+                row.update(
+                    {
+                        "foodSafety": subs.get("foodSafety"),
+                        "regulatory": subs.get("regulatory"),
+                        "operational": subs.get("operational"),
+                        "financial": subs.get("financial"),
+                    }
+                )
                 rows.append(row)
 
             df = pd.DataFrame(rows)
@@ -233,15 +293,40 @@ if uploaded_file is not None:
 
                 gb = GridOptionsBuilder.from_dataframe(display_df)
                 gb.configure_default_column(filter=True, sortable=True, resizable=True)
-                gb.configure_column("risk_score", type=["numericColumn", "numberColumnFilter"], width=110)
-                gb.configure_column("risk_probability", type=["numericColumn"], width=130)
+                gb.configure_column(
+                    "risk_score",
+                    type=["numericColumn", "numberColumnFilter"],
+                    width=110,
+                )
+                gb.configure_column(
+                    "risk_probability", type=["numericColumn"], width=130
+                )
                 grid_options = gb.build()
-                AgGrid(display_df, gridOptions=grid_options, fit_columns_on_grid_load=True, enable_enterprise_modules=False, height=480)
+                AgGrid(
+                    display_df,
+                    gridOptions=grid_options,
+                    fit_columns_on_grid_load=True,
+                    enable_enterprise_modules=False,
+                    height=480,
+                )
             except Exception:
-                st.info("For an interactive table with sorting and filters, install `st-aggrid` (pip install st-aggrid). Showing static table instead.")
-                st.dataframe(df.style.format(fmt).bar(subset=["risk_score"], color="#f63366").hide(axis="index"), use_container_width=True, height=480)
+                st.info(
+                    "For an interactive table with sorting and filters, install `st-aggrid` (pip install st-aggrid). Showing static table instead."
+                )
+                st.dataframe(
+                    df.style.format(fmt)
+                    .bar(subset=["risk_score"], color="#f63366")
+                    .hide(axis="index"),
+                    use_container_width=True,
+                    height=480,
+                )
             # Allow user to download scored results
             csv = display_df.to_csv(index=False)
-            st.download_button("Download scored results (CSV)", csv, file_name="scored_suppliers.csv", mime="text/csv")
+            st.download_button(
+                "Download scored results (CSV)",
+                csv,
+                file_name="scored_suppliers.csv",
+                mime="text/csv",
+            )
         except json.JSONDecodeError:
             st.error("Invalid JSON file. Please upload a valid .json document.")
