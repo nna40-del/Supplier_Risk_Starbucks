@@ -17,7 +17,7 @@ test_result = {
     "labor_violations": 0.75,
     "environmental_damage": 0.85,
     "political_instability": 0.2,
-    "financial_distress": 0.6
+    "financial_distress": 0.6,
 }
 
 print("🧪 Testing News Database Functionality...\n")
@@ -37,14 +37,16 @@ db.save_scoring_result(
     keyword_intensity_score=0.72,
     disruption_similarity_score=0.58,
     theme_scores=test_result,
-    full_results={"raw": "test"}
+    full_results={"raw": "test"},
 )
 print("   ✓ Scoring result saved\n")
 
 # Test 3: Get article
 print("3️⃣ Retrieving article from database...")
 retrieved = db.get_article(article_id)
-print(f"   ✓ Retrieved: {retrieved['filename']} ({retrieved['content_length']} chars)\n")
+print(
+    f"   ✓ Retrieved: {retrieved['filename']} ({retrieved['content_length']} chars)\n"
+)
 
 # Test 4: Get all articles
 print("4️⃣ Retrieving all articles...")
@@ -56,7 +58,9 @@ print("5️⃣ Retrieving scoring results...")
 scores = db.get_scoring_results_for_article(article_id)
 print(f"   ✓ Found {len(scores)} scoring result(s)")
 if scores:
-    print(f"   ✓ Risk Score: {scores[0]['overall_risk_score']}, Risk Level: {scores[0]['risk_level']}\n")
+    print(
+        f"   ✓ Risk Score: {scores[0]['overall_risk_score']}, Risk Level: {scores[0]['risk_level']}\n"
+    )
 
 # Test 6: Get summary stats
 print("6️⃣ Getting database statistics...")
@@ -88,11 +92,15 @@ sup_id = sup_db.save_supplier(supplier)
 print(f"   ✓ Supplier saved with ID: {sup_id}")
 
 # score the supplier
-sup_db.save_scoring_result(sup_id, risk_score=60, risk_level="HIGH", subscores={"dummy": 0.6})
+sup_db.save_scoring_result(
+    sup_id, risk_score=60, risk_level="HIGH", subscores={"dummy": 0.6}
+)
 print("   ✓ Supplier scoring result saved")
 
 # save a news article linked to that supplier
-article_id_2 = db.save_article("supplier_news.txt", test_article, supplier_name="Example Supplier")
+article_id_2 = db.save_article(
+    "supplier_news.txt", test_article, supplier_name="Example Supplier"
+)
 print(f"   ✓ Article saved with supplier link ID: {article_id_2}")
 
 # score it for completeness
@@ -104,7 +112,7 @@ db.save_scoring_result(
     keyword_intensity_score=0.65,
     disruption_similarity_score=0.50,
     theme_scores=test_result,
-    full_results={"raw": "test2"}
+    full_results={"raw": "test2"},
 )
 print("   ✓ Scoring result for linked article saved")
 

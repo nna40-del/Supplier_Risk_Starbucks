@@ -13,20 +13,14 @@ test_supplier = {
     "foodSafetyQuality": {
         "gfsCertification": "SQF Level 3",
         "lastAudit": "2025-06",
-        "recallHistory": "None in last 5 years"
+        "recallHistory": "None in last 5 years",
     },
     "regulatoryCompliance": {
         "fdaInspections": "No 483s",
-        "supplierCodeOfConduct": "Signed"
+        "supplierCodeOfConduct": "Signed",
     },
-    "operationalReliability": {
-        "otif": "97%",
-        "leadTime": "7–10 days"
-    },
-    "financialStability": {
-        "creditRisk": "Low",
-        "revenueTrend": "Stable"
-    }
+    "operationalReliability": {"otif": "97%", "leadTime": "7–10 days"},
+    "financialStability": {"creditRisk": "Low", "revenueTrend": "Stable"},
 }
 
 print("🧪 Testing Database Functionality...\n")
@@ -46,8 +40,8 @@ db.save_scoring_result(
         "foodSafety": 0.45,
         "regulatory": 0.35,
         "operational": 0.25,
-        "financial": 0.40
-    }
+        "financial": 0.40,
+    },
 )
 print("   ✓ Scoring result saved\n")
 

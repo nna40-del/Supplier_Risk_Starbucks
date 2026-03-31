@@ -39,7 +39,7 @@ class NewsDatabase:
         # ensure column exists for older databases
         cursor.execute("PRAGMA table_info(news_articles)")
         existing = [row[1] for row in cursor.fetchall()]
-        if 'supplier_name' not in existing:
+        if "supplier_name" not in existing:
             cursor.execute("ALTER TABLE news_articles ADD COLUMN supplier_name TEXT")
 
         # News scoring results table
@@ -62,15 +62,17 @@ class NewsDatabase:
         conn.commit()
         conn.close()
 
-    def save_article(self, filename: str, content: str, supplier_name: Optional[str] = None) -> int:
+    def save_article(
+        self, filename: str, content: str, supplier_name: Optional[str] = None
+    ) -> int:
         """
         Save a news article to the database.
-        
+
         Args:
             filename: Name of the file
             content: Text content of the article
             supplier_name: Optional supplier name associated with article
-            
+
         Returns:
             Article ID
         """
@@ -79,11 +81,14 @@ class NewsDatabase:
 
         content_length = len(content)
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO news_articles (filename, content, content_length, supplier_name)
             VALUES (?, ?, ?, ?)
-        """, (filename, content, content_length, supplier_name))
-        
+        """,
+            (filename, content, content_length, supplier_name),
+        )
+
         conn.commit()
         cursor.execute("SELECT last_insert_rowid()")
         article_id = cursor.fetchone()[0]
@@ -91,15 +96,20 @@ class NewsDatabase:
 
         return article_id
 
-    def save_scoring_result(self, article_id: int, overall_risk_score: float,
-                           risk_level: str, sentiment_score: float,
-                           keyword_intensity_score: float,
-                           disruption_similarity_score: float,
-                           theme_scores: Dict[str, float],
-                           full_results: Dict[str, Any]) -> int:
+    def save_scoring_result(
+        self,
+        article_id: int,
+        overall_risk_score: float,
+        risk_level: str,
+        sentiment_score: float,
+        keyword_intensity_score: float,
+        disruption_similarity_score: float,
+        theme_scores: Dict[str, float],
+        full_results: Dict[str, Any],
+    ) -> int:
         """
         Save a news scoring result.
-        
+
         Args:
             article_id: ID of the article
             overall_risk_score: Overall risk score (0-100)
@@ -109,7 +119,7 @@ class NewsDatabase:
             disruption_similarity_score: Disruption similarity score
             theme_scores: Dictionary of theme scores
             full_results: Complete scoring results JSON
-            
+
         Returns:
             Scoring result ID
         """
@@ -119,14 +129,24 @@ class NewsDatabase:
         theme_scores_json = json.dumps(theme_scores)
         full_results_json = json.dumps(full_results)
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO news_scoring_results 
             (article_id, overall_risk_score, risk_level, sentiment_score, 
              keyword_intensity_score, disruption_similarity_score, theme_scores, full_results)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (article_id, overall_risk_score, risk_level, sentiment_score,
-              keyword_intensity_score, disruption_similarity_score,
-              theme_scores_json, full_results_json))
+        """,
+            (
+                article_id,
+                overall_risk_score,
+                risk_level,
+                sentiment_score,
+                keyword_intensity_score,
+                disruption_similarity_score,
+                theme_scores_json,
+                full_results_json,
+            ),
+        )
 
         conn.commit()
         cursor.execute("SELECT last_insert_rowid()")
@@ -158,20 +178,25 @@ class NewsDatabase:
 
         return [dict(row) for row in rows]
 
-    def get_article_with_latest_score(self, article_id: int) -> Optional[Dict[str, Any]]:
+    def get_article_with_latest_score(
+        self, article_id: int
+    ) -> Optional[Dict[str, Any]]:
         """Get an article with its latest scoring result."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        
-        cursor.execute("""
+
+        cursor.execute(
+            """
             SELECT a.*, s.* 
             FROM news_articles a
             LEFT JOIN news_scoring_results s ON a.id = s.article_id
             WHERE a.id = ?
             ORDER BY s.scored_at DESC
             LIMIT 1
-        """, (article_id,))
-        
+        """,
+            (article_id,),
+        )
+
         row = cursor.fetchone()
         conn.close()
 
@@ -199,7 +224,7 @@ class NewsDatabase:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT * FROM news_scoring_results WHERE article_id = ? ORDER BY scored_at DESC",
-            (article_id,)
+            (article_id,),
         )
         rows = cursor.fetchall()
         conn.close()
@@ -212,7 +237,7 @@ class NewsDatabase:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT * FROM news_articles WHERE supplier_name = ? ORDER BY uploaded_at DESC",
-            (supplier_name,)
+            (supplier_name,),
         )
         rows = cursor.fetchall()
         conn.close()
@@ -238,15 +263,21 @@ class NewsDatabase:
         """)
         rows = cursor.fetchall()
         conn.close()
-        return {row["supplier_name"]: {"count": row["article_count"],
-                                        "avg_score": row["avg_score"],
-                                        "max_score": row["max_score"]}
-                for row in rows}
+        return {
+            row["supplier_name"]: {
+                "count": row["article_count"],
+                "avg_score": row["avg_score"],
+                "max_score": row["max_score"],
+            }
+            for row in rows
+        }
+
     def get_articles_by_risk_level(self, risk_level: str) -> List[Dict[str, Any]]:
         """Get articles by their latest risk level."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT DISTINCT a.* FROM news_articles a
             INNER JOIN (
                 SELECT article_id, MAX(scored_at) as latest_score
@@ -256,7 +287,9 @@ class NewsDatabase:
             INNER JOIN news_scoring_results s ON a.id = s.article_id AND s.scored_at = latest.latest_score
             WHERE s.risk_level = ?
             ORDER BY a.uploaded_at DESC
-        """, (risk_level,))
+        """,
+            (risk_level,),
+        )
         rows = cursor.fetchall()
         conn.close()
 
@@ -266,10 +299,12 @@ class NewsDatabase:
         """Delete an article and all its scoring results."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        
-        cursor.execute("DELETE FROM news_scoring_results WHERE article_id = ?", (article_id,))
+
+        cursor.execute(
+            "DELETE FROM news_scoring_results WHERE article_id = ?", (article_id,)
+        )
         cursor.execute("DELETE FROM news_articles WHERE id = ?", (article_id,))
-        
+
         conn.commit()
         affected = cursor.rowcount
         conn.close()
@@ -280,13 +315,15 @@ class NewsDatabase:
         """Delete multiple articles and their scoring results."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        
+
         deleted_count = 0
         for article_id in article_ids:
-            cursor.execute("DELETE FROM news_scoring_results WHERE article_id = ?", (article_id,))
+            cursor.execute(
+                "DELETE FROM news_scoring_results WHERE article_id = ?", (article_id,)
+            )
             cursor.execute("DELETE FROM news_articles WHERE id = ?", (article_id,))
             deleted_count += 1
-        
+
         conn.commit()
         conn.close()
 
@@ -344,27 +381,30 @@ class NewsDatabase:
             "total_articles": total,
             "risk_distribution": risk_dist,
             "average_risk_score": round(avg_score, 2),
-            "average_sentiment_score": round(avg_sentiment, 3)
+            "average_sentiment_score": round(avg_sentiment, 3),
         }
 
     def search_articles(self, keyword: str) -> List[Dict[str, Any]]:
         """
         Search articles by keyword in filename or content.
-        
+
         Args:
             keyword: Search keyword
-            
+
         Returns:
             List of matching articles
         """
         conn = self._get_connection()
         cursor = conn.cursor()
         search_term = f"%{keyword}%"
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT * FROM news_articles
             WHERE filename LIKE ? OR content LIKE ?
             ORDER BY uploaded_at DESC
-        """, (search_term, search_term))
+        """,
+            (search_term, search_term),
+        )
         rows = cursor.fetchall()
         conn.close()
 

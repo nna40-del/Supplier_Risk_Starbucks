@@ -74,6 +74,7 @@ THEME_KEYWORDS: Dict[str, List[str]] = {
     ],
 }
 
+
 # helper dataclass for results
 @dataclass
 class NewsRiskResult:
@@ -94,6 +95,7 @@ class NewsRiskResult:
 
 
 # -- core utility functions -------------------------------------------------
+
 
 def generate_embedding(text: str) -> List[float]:
     """Return an embedding vector for the provided text using a local model.
@@ -237,7 +239,9 @@ def compute_overall_news_risk_score(
     keyword_component = keyword_intensity * 25.0
     disruption_component = disruption_sim * 25.0
 
-    raw = sentiment_component + theme_component + keyword_component + disruption_component
+    raw = (
+        sentiment_component + theme_component + keyword_component + disruption_component
+    )
     score = max(min(raw, 100.0), 0.0)
     return round(score, 2)
 
@@ -292,6 +296,7 @@ def score_article(
 
 
 # --- sample main -----------------------------------------------------------
+
 
 def main() -> None:
     """Simple demonstration of how to use the scoring module."""

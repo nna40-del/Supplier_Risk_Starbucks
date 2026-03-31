@@ -57,10 +57,10 @@ class SupplierDatabase:
     def save_supplier(self, supplier: Dict[str, Any]) -> int:
         """
         Save a supplier to the database.
-        
+
         Args:
             supplier: Dictionary with supplier data (must contain 'name' key)
-            
+
         Returns:
             Supplier ID
         """
@@ -74,20 +74,23 @@ class SupplierDatabase:
         supplier_json = json.dumps(supplier)
 
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO suppliers (name, data)
                 VALUES (?, ?)
                 ON CONFLICT(name) DO UPDATE SET
                     data = excluded.data,
                     updated_at = CURRENT_TIMESTAMP
-            """, (name, supplier_json))
+            """,
+                (name, supplier_json),
+            )
             conn.commit()
-            
+
             # Get the supplier ID
             cursor.execute("SELECT id FROM suppliers WHERE name = ?", (name,))
             result = cursor.fetchone()
             supplier_id = result[0] if result else None
-            
+
             conn.close()
             return supplier_id
         except Exception as e:
@@ -97,10 +100,10 @@ class SupplierDatabase:
     def save_suppliers_batch(self, suppliers: List[Dict[str, Any]]) -> List[int]:
         """
         Save multiple suppliers to the database.
-        
+
         Args:
             suppliers: List of supplier dictionaries
-            
+
         Returns:
             List of supplier IDs
         """
@@ -110,17 +113,22 @@ class SupplierDatabase:
             supplier_ids.append(supplier_id)
         return supplier_ids
 
-    def save_scoring_result(self, supplier_id: int, risk_score: int, 
-                           risk_level: str, subscores: Dict[str, float]) -> int:
+    def save_scoring_result(
+        self,
+        supplier_id: int,
+        risk_score: int,
+        risk_level: str,
+        subscores: Dict[str, float],
+    ) -> int:
         """
         Save a scoring result for a supplier.
-        
+
         Args:
             supplier_id: ID of the supplier
             risk_score: Calculated risk score (0-100)
             risk_level: Risk level (LOW, MODERATE, HIGH, SEVERE)
             subscores: Dictionary with component scores
-            
+
         Returns:
             Scoring history ID
         """
@@ -129,17 +137,23 @@ class SupplierDatabase:
 
         subscores_json = json.dumps(subscores)
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO scoring_history (supplier_id, risk_score, risk_level, subscores)
             VALUES (?, ?, ?, ?)
-        """, (supplier_id, risk_score, risk_level, subscores_json))
-        
+        """,
+            (supplier_id, risk_score, risk_level, subscores_json),
+        )
+
         # Update supplier's current risk score
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE suppliers
             SET risk_score = ?, risk_level = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        """, (risk_score, risk_level, supplier_id))
+        """,
+            (risk_score, risk_level, supplier_id),
+        )
 
         conn.commit()
         cursor.execute("SELECT last_insert_rowid()")
@@ -190,7 +204,7 @@ class SupplierDatabase:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT * FROM suppliers WHERE risk_level = ? ORDER BY updated_at DESC",
-            (risk_level,)
+            (risk_level,),
         )
         rows = cursor.fetchall()
         conn.close()
@@ -203,7 +217,7 @@ class SupplierDatabase:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT * FROM scoring_history WHERE supplier_id = ? ORDER BY scored_at DESC",
-            (supplier_id,)
+            (supplier_id,),
         )
         rows = cursor.fetchall()
         conn.close()
@@ -214,10 +228,12 @@ class SupplierDatabase:
         """Delete a supplier and their history."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        
-        cursor.execute("DELETE FROM scoring_history WHERE supplier_id = ?", (supplier_id,))
+
+        cursor.execute(
+            "DELETE FROM scoring_history WHERE supplier_id = ?", (supplier_id,)
+        )
         cursor.execute("DELETE FROM suppliers WHERE id = ?", (supplier_id,))
-        
+
         conn.commit()
         affected = cursor.rowcount
         conn.close()
@@ -240,7 +256,9 @@ class SupplierDatabase:
         """)
         risk_dist = {row["risk_level"]: row["count"] for row in cursor.fetchall()}
 
-        cursor.execute("SELECT AVG(risk_score) as avg_score FROM suppliers WHERE risk_score IS NOT NULL")
+        cursor.execute(
+            "SELECT AVG(risk_score) as avg_score FROM suppliers WHERE risk_score IS NOT NULL"
+        )
         avg_score = cursor.fetchone()["avg_score"] or 0
 
         conn.close()
@@ -248,5 +266,5 @@ class SupplierDatabase:
         return {
             "total_suppliers": total,
             "risk_distribution": risk_dist,
-            "average_risk_score": round(avg_score, 2)
+            "average_risk_score": round(avg_score, 2),
         }

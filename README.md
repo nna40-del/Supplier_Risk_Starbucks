@@ -165,6 +165,11 @@ The model itself (all-MiniLM-L6-v2) is **pre-trained** — it came from a librar
 
    That's it! No API keys, no external service subscriptions needed.
 
+4. ** Run the program. **
+  ```bash
+  streamlit run app.py
+  ```
+
 ## Database Features
 
 ### Automatic Supplier Storage
