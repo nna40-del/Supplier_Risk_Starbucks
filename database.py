@@ -189,14 +189,59 @@ class SupplierDatabase:
         return dict(row)
 
     def get_all_suppliers(self) -> List[Dict[str, Any]]:
-        """Get all suppliers."""
+        """Get all suppliers with their latest subscores."""
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM suppliers ORDER BY updated_at DESC")
         rows = cursor.fetchall()
-        conn.close()
 
-        return [dict(row) for row in rows]
+        suppliers = []
+        for row in rows:
+            supplier_dict = dict(row)
+            supplier_id = supplier_dict.get("id")
+
+            # Get latest scoring history to extract subscores
+            cursor.execute(
+                """
+                SELECT subscores FROM scoring_history 
+                WHERE supplier_id = ? 
+                ORDER BY scored_at DESC LIMIT 1
+                """,
+                (supplier_id,),
+            )
+            history_row = cursor.fetchone()
+
+            # Parse subscores or set defaults
+            if history_row and history_row["subscores"]:
+                try:
+                    subscores = json.loads(history_row["subscores"])
+                    supplier_dict["risk_probability"] = (
+                        subscores.get("foodSafety", 0) * 0.35
+                        + subscores.get("regulatory", 0) * 0.25
+                        + subscores.get("operational", 0) * 0.25
+                        + subscores.get("financial", 0) * 0.15
+                    )
+                    supplier_dict["foodSafety"] = subscores.get("foodSafety", 0.0)
+                    supplier_dict["regulatory"] = subscores.get("regulatory", 0.0)
+                    supplier_dict["operational"] = subscores.get("operational", 0.0)
+                    supplier_dict["financial"] = subscores.get("financial", 0.0)
+                except Exception:
+                    supplier_dict["risk_probability"] = 0.0
+                    supplier_dict["foodSafety"] = 0.0
+                    supplier_dict["regulatory"] = 0.0
+                    supplier_dict["operational"] = 0.0
+                    supplier_dict["financial"] = 0.0
+            else:
+                supplier_dict["risk_probability"] = 0.0
+                supplier_dict["foodSafety"] = 0.0
+                supplier_dict["regulatory"] = 0.0
+                supplier_dict["operational"] = 0.0
+                supplier_dict["financial"] = 0.0
+
+            suppliers.append(supplier_dict)
+
+        conn.close()
+        return suppliers
 
     def get_suppliers_by_risk_level(self, risk_level: str) -> List[Dict[str, Any]]:
         """Get suppliers by risk level."""

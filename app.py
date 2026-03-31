@@ -534,7 +534,128 @@ The system will score them based on food safety, regulatory, operational, and fi
                                 f"{get_color(fin_score)} Financial", f"{fin_score:.3f}"
                             )
 
+                        # Add recommendations based on risk level and component scores
+                        st.markdown("---")
+                        st.markdown("### **📋 Recommended Actions**")
+
+                        risk_level = supplier_row["risk_level"]
+                        risk_score = supplier_row["risk_score"]
+
+                        # Define recommendations by risk level
+                        if risk_level == "LOW":
+                            st.success(
+                                "✅ **LOW RISK** - This supplier is performing well across all metrics."
+                            )
+                            st.write(
+                                """
+                                **Recommended Actions:**
+                                - Continue routine monitoring and periodic audits
+                                - Maintain regular communication with supplier
+                                - Consider as a preferred or strategic partner
+                                - Review performance metrics annually
+                                """
+                            )
+                        elif risk_level == "MODERATE":
+                            st.warning(
+                                "🟡 **MODERATE RISK** - This supplier has some areas that need attention."
+                            )
+                            st.write(
+                                """
+                                **Recommended Actions:**
+                                - Increase audit frequency to semi-annual reviews
+                                - Develop corrective action plans for weakened areas
+                                - Schedule quarterly business reviews
+                                - Monitor news and regulatory updates closely
+                                - Consider diversifying sourcing for critical items
+                                """
+                            )
+                        elif risk_level == "HIGH":
+                            st.error(
+                                "🔴 **HIGH RISK** - This supplier requires immediate attention and mitigation."
+                            )
+                            st.write(
+                                """
+                                **Recommended Actions:**
+                                - Conduct detailed compliance audit within 30 days
+                                - Issue formal corrective action notice
+                                - Implement monthly monitoring and reporting
+                                - Develop contingency sourcing plan
+                                - Consider supplier remediation or replacement
+                                - Brief senior management on risk exposure
+                                """
+                            )
+                        else:  # SEVERE
+                            st.error(
+                                "⚫ **SEVERE RISK** - This supplier poses critical risk to operations."
+                            )
+                            st.write(
+                                """
+                                **Recommended Actions - URGENT:**
+                                - **Immediate escalation** to senior management
+                                - Suspend new orders pending approved remediation plan
+                                - Conduct comprehensive audit within 14 days
+                                - Require detailed corrective action plan with timeline
+                                - Implement daily monitoring and reporting
+                                - Activate emergency backup suppliers immediately
+                                - Legal/procurement review of contract terms
+                                - Consider supplier replacement or de-certification
+                                """
+                            )
+
+                        # Add component-specific guidance
+                        st.markdown("**Component-Specific Guidance:**")
+                        component_guidance = []
+
+                        fs_score = supplier_row["foodSafety"]
+                        if fs_score > 0.6:
+                            component_guidance.append(
+                                "🍔 **Food Safety**: High risk - Require food safety certification audit"
+                            )
+                        elif fs_score > 0.4:
+                            component_guidance.append(
+                                "🍔 **Food Safety**: Moderate risk - Increase inspection frequency"
+                            )
+
+                        reg_score = supplier_row["regulatory"]
+                        if reg_score > 0.6:
+                            component_guidance.append(
+                                "⚖️ **Regulatory**: High risk - Verify regulatory compliance status immediately"
+                            )
+                        elif reg_score > 0.4:
+                            component_guidance.append(
+                                "⚖️ **Regulatory**: Moderate risk - Monitor regulatory updates closely"
+                            )
+
+                        op_score = supplier_row["operational"]
+                        if op_score > 0.6:
+                            component_guidance.append(
+                                "⚙️ **Operational**: High risk - Assess production capacity and reliability"
+                            )
+                        elif op_score > 0.4:
+                            component_guidance.append(
+                                "⚙️ **Operational**: Moderate risk - Review backup facilities and contingency plans"
+                            )
+
+                        fin_score = supplier_row["financial"]
+                        if fin_score > 0.6:
+                            component_guidance.append(
+                                "💰 **Financial**: High risk - Request updated financial statements"
+                            )
+                        elif fin_score > 0.4:
+                            component_guidance.append(
+                                "💰 **Financial**: Moderate risk - Monitor financial health trends"
+                            )
+
+                        if component_guidance:
+                            for guidance in component_guidance:
+                                st.write(f"• {guidance}")
+                        else:
+                            st.write(
+                                "✅ All components are within acceptable risk tolerances."
+                            )
+
                         # Radar chart for this supplier
+                        st.markdown("---")
                         categories = [
                             "Food Safety",
                             "Regulatory",
@@ -893,6 +1014,19 @@ and financial distress, providing actionable risk scores and recommendations.
                     f"Loaded {len(articles_list)} article(s) from {len(uploaded_news_files)} file(s)."
                 )
 
+    # Show info about news scoring
+    st.info("""
+    **📋 News Risk Scoring Explained:**
+    - **Scoring Scale:** 0-100 (0=Low risk, 100=High risk)
+    - **Factors:** Analyzes sentiment, keywords (strikes, bankruptcy, pollution, etc.), and disruption themes
+    - **Low Risk (0-30):** Positive news, expansions, investments
+    - **Moderate (30-50):** Mixed news with some risk signals
+    - **High (50-80):** Concerning issues affecting operations
+    - **Severe (80-100):** Critical disruptions or major violations
+    
+    *Tip: Upload articles containing risk keywords like "strike," "bankruptcy," "pollution," or "disruption" to see non-zero risk scores.*
+    """)
+
     if articles_list and st.button(
         "🔍 Analyze Article(s) for Risk", type="primary", key="analyze_news"
     ):
@@ -961,9 +1095,15 @@ and financial distress, providing actionable risk scores and recommendations.
                         def normalize_text(text):
                             """Normalize text for better matching by removing punctuation and extra spaces."""
                             import re
+                            import unicodedata
 
-                            # Remove apostrophes (both straight and curly), quotes, and other punctuation
-                            text = re.sub(r"[\'\u2019\"]", "", text)
+                            # Normalize Unicode to handle accented characters
+                            text = unicodedata.normalize("NFKD", text)
+                            text = text.encode("ascii", "ignore").decode("utf-8")
+                            # Replace underscores and hyphens with spaces
+                            text = re.sub(r"[_\-]", " ", text)
+                            # Remove all punctuation except spaces and word characters
+                            text = re.sub(r"[^\w\s]", "", text)
                             # Remove extra spaces
                             text = re.sub(r"\s+", " ", text).strip()
                             return text.lower()
@@ -1000,10 +1140,16 @@ and financial distress, providing actionable risk scores and recommendations.
                                         break
 
                         # Save article to database with optional supplier linkage
+                        print(
+                            f"DEBUG: Saving article '{filename}' with supplier: {supplier_match}"
+                        )
                         article_id = news_db.save_article(
                             filename,
                             result["article_text"],
                             supplier_name=supplier_match,
+                        )
+                        print(
+                            f"DEBUG: Article saved with ID: {article_id}, supplier_match: {supplier_match}"
                         )
 
                         # Save scoring result
@@ -1190,15 +1336,27 @@ with db_tabs[0]:
 
     # Display database statistics
     all_suppliers = db.get_all_suppliers()
+    print(f"\n=== DEBUG: All suppliers loaded: {len(all_suppliers)} ===")
+    for s in all_suppliers:
+        print(f"  - {s.get('name')}")
+
+    print(f"=== DEBUG: Calling get_supplier_news_stats ===")
     news_stats = news_db.get_supplier_news_stats()
+    print(f"=== DEBUG: News stats result: {news_stats} ===")
+
+    # Show debug info in UI
+    with st.expander("🔧 Debug Info - Database Stats", expanded=False):
+        st.write(f"**Suppliers:** {len(all_suppliers)}")
+        st.write(f"**All suppliers loaded:** {all_suppliers}")
+        st.write(f"**News stats:** {news_stats}")
 
     # build combined summary records
     combined_data = []
     for s in all_suppliers:
         name = s.get("name")
         count = news_stats.get(name, {}).get("count", 0)
-        avg_news = news_stats.get(name, {}).get("avg_score", 0)
-        max_news = news_stats.get(name, {}).get("max_score", 0)
+        avg_news = float(news_stats.get(name, {}).get("avg_score", 0.0) or 0.0)
+        max_news = float(news_stats.get(name, {}).get("max_score", 0.0) or 0.0)
         combined_score = None
         combined_level = None
         if count > 0:
@@ -1216,13 +1374,13 @@ with db_tabs[0]:
         combined_data.append(
             {
                 "Name": name,
-                "Risk Probability": s.get("risk_probability"),
-                "Food Safety": s.get("foodSafety"),
-                "Regulatory": s.get("regulatory"),
-                "Operational": s.get("operational"),
-                "Financial": s.get("financial"),
-                "Supplier Risk Score": s.get("risk_score"),
-                "Supplier Risk Level": s.get("risk_level"),
+                "Risk Probability": s.get("risk_probability", 0.0),
+                "Food Safety": s.get("foodSafety", 0.0),
+                "Regulatory": s.get("regulatory", 0.0),
+                "Operational": s.get("operational", 0.0),
+                "Financial": s.get("financial", 0.0),
+                "Supplier Risk Score": s.get("risk_score", 0),
+                "Supplier Risk Level": s.get("risk_level", "UNKNOWN"),
                 "Articles": count,
                 "Avg News Risk": round(avg_news, 1),
                 "Max News Risk": round(max_news, 1),
@@ -1254,61 +1412,96 @@ with db_tabs[0]:
         else:
             col2.metric("📉 Avg Combined Score", "N/A")
 
+        # Display with key columns visible
+        st.markdown("**📊 Combined Risk Summary Table**")
+        display_cols = [
+            "Name",
+            "Supplier Risk Score",
+            "Supplier Risk Level",
+            "Articles",
+            "Avg News Risk",
+            "Max News Risk",
+            "Combined Score",
+            "Combined Level",
+        ]
+        display_cols = [c for c in display_cols if c in combined_df.columns]
+        st.dataframe(combined_df[display_cols], use_container_width=True)
+
+        st.markdown("**📈 Extended View (All Columns)**")
         st.dataframe(combined_df, use_container_width=True)
 
         # chart supplier risk vs news risk with component breakdown
-        fig = go.Figure()
-        fig.add_trace(
+        # Chart 1: Component Scores and News Risk
+        fig1 = go.Figure()
+        fig1.add_trace(
             go.Bar(
                 name="Risk Probability",
                 x=combined_df["Name"],
                 y=combined_df["Risk Probability"],
             )
         )
-        fig.add_trace(
+        fig1.add_trace(
             go.Bar(
                 name="Food Safety",
                 x=combined_df["Name"],
                 y=combined_df["Food Safety"],
             )
         )
-        fig.add_trace(
+        fig1.add_trace(
             go.Bar(
                 name="Regulatory",
                 x=combined_df["Name"],
                 y=combined_df["Regulatory"],
             )
         )
-        fig.add_trace(
+        fig1.add_trace(
             go.Bar(
                 name="Operational",
                 x=combined_df["Name"],
                 y=combined_df["Operational"],
             )
         )
-        fig.add_trace(
+        fig1.add_trace(
             go.Bar(
                 name="Financial",
                 x=combined_df["Name"],
                 y=combined_df["Financial"],
             )
         )
-        fig.add_trace(
-            go.Bar(
-                name="Supplier Risk Score",
-                x=combined_df["Name"],
-                y=combined_df["Supplier Risk Score"],
-            )
-        )
-        fig.add_trace(
+        fig1.add_trace(
             go.Bar(
                 name="Avg News Risk",
                 x=combined_df["Name"],
                 y=combined_df["Avg News Risk"],
             )
         )
-        fig.update_layout(barmode="group", xaxis_tickangle=-45, height=500)
-        st.plotly_chart(fig, use_container_width=True)
+        fig1.update_layout(
+            title="Risk Components & News Risk by Supplier",
+            barmode="group",
+            xaxis_tickangle=-45,
+            height=500,
+        )
+        st.plotly_chart(fig1, use_container_width=True)
+
+        # Chart 2: Supplier Risk Score (Separate)
+        st.markdown("---")
+        fig2 = go.Figure()
+        fig2.add_trace(
+            go.Bar(
+                name="Supplier Risk Score",
+                x=combined_df["Name"],
+                y=combined_df["Supplier Risk Score"],
+                marker_color="indianred",
+            )
+        )
+        fig2.update_layout(
+            title="Supplier Risk Score by Supplier",
+            xaxis_title="Supplier Name",
+            yaxis_title="Risk Score (0-100)",
+            height=400,
+            xaxis_tickangle=-45,
+        )
+        st.plotly_chart(fig2, use_container_width=True)
 
         # allow inspection of individual supplier's articles
         if total_with_news > 0:
@@ -1323,12 +1516,354 @@ with db_tabs[0]:
                 if articles:
                     art_df = pd.DataFrame(articles)
                     st.write(f"Articles associated with **{selected_supplier}**")
-                    # show minimal details
+
+                    # Add delete functionality
+                    st.markdown("### 🗑️ Delete Articles")
+                    st.markdown(
+                        "Select articles to delete and click the delete button below."
+                    )
+
+                    # Create checkboxes for each article
+                    selected_articles = []
+                    for i, article in enumerate(articles):
+                        col1, col2, col3, col4 = st.columns([1, 3, 2, 2])
+                        with col1:
+                            if st.checkbox(
+                                f"Select",
+                                key=f"delete_article_{article['id']}_{selected_supplier}",
+                                help=f"Select to delete: {article['filename']}",
+                            ):
+                                selected_articles.append(article["id"])
+                        with col2:
+                            st.write(f"**{article['filename']}**")
+                        with col3:
+                            st.write(f"ID: {article['id']}")
+                        with col4:
+                            st.write(f"Length: {article['content_length']} chars")
+
+                    # Delete button
+                    if selected_articles:
+                        # Check if delete was initiated
+                        if st.button(
+                            f"🗑️ Delete {len(selected_articles)} Selected Article(s)",
+                            type="secondary",
+                            key=f"delete_btn_{selected_supplier}",
+                        ):
+                            # Set session state to show confirmation
+                            st.session_state[f"confirm_delete_{selected_supplier}"] = (
+                                True
+                            )
+
+                        # Show confirmation dialog if delete was initiated
+                        if st.session_state.get(
+                            f"confirm_delete_{selected_supplier}", False
+                        ):
+                            st.warning(
+                                f"⚠️ Are you sure you want to delete {len(selected_articles)} article(s)? This action cannot be undone."
+                            )
+
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                if st.button(
+                                    "✅ Yes, Delete",
+                                    type="primary",
+                                    key=f"confirm_yes_{selected_supplier}",
+                                ):
+                                    try:
+                                        deleted_count = news_db.delete_articles_batch(
+                                            selected_articles
+                                        )
+                                        st.success(
+                                            f"✅ Successfully deleted {deleted_count} article(s)!"
+                                        )
+
+                                        # Clear confirmation state
+                                        st.session_state[
+                                            f"confirm_delete_{selected_supplier}"
+                                        ] = False
+
+                                        # Refresh the data
+                                        st.session_state.data_refresh_trigger += 1
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(
+                                            f"❌ Error deleting articles: {str(e)}"
+                                        )
+                                        st.session_state[
+                                            f"confirm_delete_{selected_supplier}"
+                                        ] = False
+
+                            with col2:
+                                if st.button(
+                                    "❌ Cancel",
+                                    key=f"confirm_cancel_{selected_supplier}",
+                                ):
+                                    st.session_state[
+                                        f"confirm_delete_{selected_supplier}"
+                                    ] = False
+                                    st.info("Deletion cancelled.")
+                                    st.rerun()
+                    else:
+                        st.info("Select articles above to enable deletion.")
+
+                    # Show article details table
+                    st.markdown("### 📄 Article Details")
                     st.dataframe(
-                        art_df[["id", "filename", "content_length"]],
+                        art_df[["id", "filename", "content_length", "uploaded_at"]],
                         use_container_width=True,
                     )
                 else:
                     st.info("No news articles associated with this supplier.")
     else:
         st.info("No suppliers saved in database yet.")
+
+# ============================================================================
+# RECOMMENDATIONS GUIDE SECTION AT END OF WEBSITE
+# ============================================================================
+st.markdown("---")
+st.markdown("### **📚 General Risk Level Guidelines**")
+
+with st.expander("🟢 **LOW RISK** - Continue Monitoring", expanded=False):
+    st.write(
+        """
+        **Situation:** Supplier is performing well across all metrics
+        
+        **Recommended Actions:**
+        - Continue routine monitoring and periodic audits
+        - Maintain regular communication with supplier
+        - Consider as a preferred or strategic partner
+        - Review performance metrics annually
+        - Schedule regular business reviews (annually or semi-annually)
+        """
+    )
+
+with st.expander("🟡 **MODERATE RISK** - Enhanced Monitoring Required", expanded=False):
+    st.write(
+        """
+        **Situation:** Supplier has some areas that need attention but is generally manageable
+        
+        **Recommended Actions:**
+        - Increase audit frequency to semi-annual reviews
+        - Develop corrective action plans for weakened areas
+        - Schedule quarterly business reviews
+        - Monitor news and regulatory updates closely
+        - Consider diversifying sourcing for critical items
+        - Request detailed improvement plans from supplier
+        - Track KPIs more frequently (monthly vs quarterly)
+        """
+    )
+
+with st.expander("🔴 **HIGH RISK** - Immediate Attention Required", expanded=False):
+    st.write(
+        """
+        **Situation:** Supplier requires immediate attention and mitigation
+        
+        **Recommended Actions - PRIORITY:**
+        - Conduct detailed compliance audit within 30 days
+        - Issue formal corrective action notice
+        - Implement monthly monitoring and reporting
+        - Develop contingency sourcing plan
+        - Brief senior management on risk exposure
+        - Consider supplier remediation or replacement
+        - Reduce orders to non-critical items only (optional)
+        - Require executive-level engagement from supplier
+        """
+    )
+
+with st.expander(
+    "⚫ **SEVERE RISK** - Critical Action Required URGENTLY", expanded=True
+):
+    st.error(
+        """
+        **ALERT:** This supplier poses critical risk to your operations
+        
+        **Recommended Actions - URGENT (Within 48-72 hours):**
+        - **Immediate escalation** to senior management and C-suite
+        - Suspend new orders pending approved remediation plan
+        - Activate emergency backup suppliers immediately
+        - Legal/procurement review of contract terms
+        - Conduct comprehensive audit within 14 days
+        
+        **Follow-up Actions (Within 1-2 weeks):**
+        - Require detailed corrective action plan with timeline
+        - Implement daily monitoring and reporting
+        - Consider supplier replacement or de-certification
+        - Communicate transition plan to affected departments
+        """
+    )
+
+st.markdown("---")
+st.markdown("## **📋 Risk Level Recommendations Guide**")
+
+st.markdown(
+    """
+This guide explains what actions your business should take based on supplier risk levels and component scores.
+"""
+)
+
+# Add dropdown to search by supplier and show specific recommendations
+st.markdown("### **🔍 Get Specific Recommendations for Your Supplier**")
+
+db = SupplierDatabase()
+all_suppliers = db.get_all_suppliers()
+
+if all_suppliers:
+    supplier_names = [s.get("name") for s in all_suppliers if s.get("name")]
+
+    if supplier_names:
+        selected_supplier_name = st.selectbox(
+            "Select a supplier to view tailored recommendations:",
+            supplier_names,
+            key="recommendations_supplier_select",
+        )
+
+        if selected_supplier_name:
+            # Find the selected supplier
+            selected_supplier = next(
+                (s for s in all_suppliers if s.get("name") == selected_supplier_name),
+                None,
+            )
+
+            if selected_supplier:
+                risk_level = selected_supplier.get("risk_level", "UNKNOWN")
+                risk_score = selected_supplier.get("risk_score", 0)
+                risk_probability = selected_supplier.get("risk_probability", 0.0)
+                fs_score = selected_supplier.get("foodSafety", 0.0)
+                reg_score = selected_supplier.get("regulatory", 0.0)
+                op_score = selected_supplier.get("operational", 0.0)
+                fin_score = selected_supplier.get("financial", 0.0)
+
+                # Display supplier metrics
+                st.markdown(f"**Supplier: {selected_supplier_name}**")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Risk Score", risk_score)
+                with col2:
+                    st.metric("Risk Level", risk_level)
+                with col3:
+                    st.metric("Risk Probability", f"{risk_probability:.3f}")
+
+                # Show specific recommendations based on risk level
+                st.markdown("---")
+                st.markdown("**📋 Tailored Recommendations for this Supplier:**")
+
+                if risk_level == "LOW":
+                    st.success(
+                        f"✅ **{selected_supplier_name}** is a **LOW RISK** supplier"
+                    )
+                    st.write(
+                        """
+                        - ✓ Continue routine monitoring and periodic audits
+                        - ✓ Maintain regular communication with supplier
+                        - ✓ Consider as a preferred or strategic partner
+                        - ✓ Review performance metrics annually
+                        - ✓ Schedule regular business reviews (annually or semi-annually)
+                        """
+                    )
+                elif risk_level == "MODERATE":
+                    st.warning(
+                        f"🟡 **{selected_supplier_name}** is a **MODERATE RISK** supplier"
+                    )
+                    st.write(
+                        """
+                        - ⚠ Increase audit frequency to semi-annual reviews
+                        - ⚠ Develop corrective action plans for weakened areas
+                        - ⚠ Schedule quarterly business reviews
+                        - ⚠ Monitor news and regulatory updates closely
+                        - ⚠ Consider diversifying sourcing for critical items
+                        - ⚠ Request detailed improvement plans from supplier
+                        - ⚠ Track KPIs more frequently (monthly vs quarterly)
+                        """
+                    )
+                elif risk_level == "HIGH":
+                    st.error(
+                        f"🔴 **{selected_supplier_name}** is a **HIGH RISK** supplier"
+                    )
+                    st.write(
+                        """
+                        - 🔴 **PRIORITY:** Conduct detailed compliance audit within 30 days
+                        - 🔴 Issue formal corrective action notice
+                        - 🔴 Implement monthly monitoring and reporting
+                        - 🔴 Develop contingency sourcing plan
+                        - 🔴 Brief senior management on risk exposure
+                        - 🔴 Consider supplier remediation or replacement
+                        - 🔴 Reduce orders to non-critical items only (optional)
+                        - 🔴 Require executive-level engagement from supplier
+                        """
+                    )
+                else:  # SEVERE
+                    st.error(
+                        f"⚫ **{selected_supplier_name}** is a **SEVERE RISK** supplier - IMMEDIATE ACTION REQUIRED"
+                    )
+                    st.write(
+                        """
+                        - ⚫ **URGENT (48-72 hours):** Immediate escalation to senior management and C-suite
+                        - ⚫ **URGENT:** Suspend new orders pending approved remediation plan
+                        - ⚫ **URGENT:** Activate emergency backup suppliers immediately
+                        - ⚫ **URGENT:** Legal/procurement review of contract terms
+                        - ⚫ Conduct comprehensive audit within 14 days
+                        - ⚫ Require detailed corrective action plan with timeline
+                        - ⚫ Implement daily monitoring and reporting
+                        - ⚫ Consider supplier replacement or de-certification
+                        """
+                    )
+
+                # Show component-specific guidance
+                st.markdown("**Component-Specific Guidance for this Supplier:**")
+
+                component_actions = []
+
+                if fs_score > 0.6:
+                    component_actions.append(
+                        "🍔 **Food Safety** [HIGH RISK]: Require food safety certification audit immediately"
+                    )
+                elif fs_score > 0.4:
+                    component_actions.append(
+                        "🍔 **Food Safety** [MODERATE]: Increase inspection frequency, review HACCP plans"
+                    )
+                else:
+                    component_actions.append(
+                        "🍔 **Food Safety** [LOW]: Continue annual audits, maintain certification monitoring"
+                    )
+
+                if reg_score > 0.6:
+                    component_actions.append(
+                        "⚖️ **Regulatory** [HIGH RISK]: Verify regulatory compliance status immediately, check for violations"
+                    )
+                elif reg_score > 0.4:
+                    component_actions.append(
+                        "⚖️ **Regulatory** [MODERATE]: Monitor regulatory updates closely, review permits"
+                    )
+                else:
+                    component_actions.append(
+                        "⚖️ **Regulatory** [LOW]: Continue compliance monitoring, periodic documentation review"
+                    )
+
+                if op_score > 0.6:
+                    component_actions.append(
+                        "⚙️ **Operational** [HIGH RISK]: Assess production capacity and reliability, review backup facilities"
+                    )
+                elif op_score > 0.4:
+                    component_actions.append(
+                        "⚙️ **Operational** [MODERATE]: Review backup facilities and contingency plans"
+                    )
+                else:
+                    component_actions.append(
+                        "⚙️ **Operational** [LOW]: Monitor OTIF and lead times, maintain communication"
+                    )
+
+                if fin_score > 0.6:
+                    component_actions.append(
+                        "💰 **Financial** [HIGH RISK]: Request updated financial statements, assess bankruptcy risk"
+                    )
+                elif fin_score > 0.4:
+                    component_actions.append(
+                        "💰 **Financial** [MODERATE]: Monitor financial health trends, track credit rating"
+                    )
+                else:
+                    component_actions.append(
+                        "💰 **Financial** [LOW]: Annual financial review, monitor revenue concentration"
+                    )
+
+                for action in component_actions:
+                    st.write(f"• {action}")

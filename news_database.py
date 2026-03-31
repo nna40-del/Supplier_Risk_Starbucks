@@ -247,30 +247,57 @@ class NewsDatabase:
         """Compute aggregated news-risk statistics per supplier."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        # join latest scoring result per article to supplier name
+
+        # Get all distinct suppliers with articles
         cursor.execute("""
-            SELECT a.supplier_name,
-                   COUNT(*) as article_count,
-                   AVG(s.overall_risk_score) as avg_score,
-                   MAX(s.overall_risk_score) as max_score
+            SELECT DISTINCT a.supplier_name
             FROM news_articles a
-            JOIN news_scoring_results s ON a.id = s.article_id
             WHERE a.supplier_name IS NOT NULL
-            AND s.id IN (
-                SELECT MAX(id) FROM news_scoring_results GROUP BY article_id
-            )
-            GROUP BY a.supplier_name
+            ORDER BY a.supplier_name
         """)
-        rows = cursor.fetchall()
-        conn.close()
-        return {
-            row["supplier_name"]: {
-                "count": row["article_count"],
-                "avg_score": row["avg_score"],
-                "max_score": row["max_score"],
+        suppliers = cursor.fetchall()
+        result = {}
+
+        for supplier_row in suppliers:
+            supplier_name = supplier_row["supplier_name"]
+
+            # Count articles for this supplier
+            cursor.execute(
+                "SELECT COUNT(*) FROM news_articles WHERE supplier_name = ?",
+                (supplier_name,),
+            )
+            article_count = cursor.fetchone()[0]
+
+            # Get  scores for articles from this supplier
+            cursor.execute(
+                """
+                SELECT s.overall_risk_score
+                FROM news_articles a
+                LEFT JOIN news_scoring_results s ON a.id = s.article_id
+                WHERE a.supplier_name = ?
+                AND s.overall_risk_score IS NOT NULL
+                ORDER BY s.overall_risk_score DESC
+            """,
+                (supplier_name,),
+            )
+
+            scores_list = [row["overall_risk_score"] for row in cursor.fetchall()]
+
+            if scores_list:
+                avg_score = sum(scores_list) / len(scores_list)
+                max_score = max(scores_list)
+            else:
+                avg_score = 0.0
+                max_score = 0.0
+
+            result[supplier_name] = {
+                "count": article_count,
+                "avg_score": avg_score,
+                "max_score": max_score,
             }
-            for row in rows
-        }
+
+        conn.close()
+        return result
 
     def get_articles_by_risk_level(self, risk_level: str) -> List[Dict[str, Any]]:
         """Get articles by their latest risk level."""
